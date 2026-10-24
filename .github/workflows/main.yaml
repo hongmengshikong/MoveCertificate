@@ -9,6 +9,8 @@ on:
     branches: [ main ]
   release:
     types: [published]
+  # 支持在 Actions 页面手动触发（方便不发版也构建一次）
+  workflow_dispatch:
 
 jobs:
   # 任务名称
@@ -20,10 +22,10 @@ jobs:
       contents: write
     # 任务步骤
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -50,7 +52,7 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
       
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: MoveCertificate-${{ steps.get_version.outputs.VERSION }}
           path: MoveCertificate-*.zip
