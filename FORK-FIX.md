@@ -91,25 +91,26 @@ KernelSU / APatch 的 Action 按钮：不重启就重新导入、重新发布、
 4. 还抓不到就查 `install.log` / Action 输出 / `status.txt`；
    若两条路径都带上了你的证书但依然握手失败，那是 app 的 SSL Pinning，不是证书问题。
 
-## 五、版本支持范围
+## 五、版本支持范围（重要）
 
-不是只修 Android 16。代码按 `ro.build.version.sdk` 分支，A14/15/16 走的是**同一段代码**
-（futex `sdk >= 34`），矩阵测试结果：
+**本分支只针对 Android 16（SDK 36）验证并修复了 Flutter 抓包。Android 14 / 15 不属于本分支的修复范围。**
 
-| sdk | 系统证书来源 | APEX 发布 | legacy overlay | 用户证书格式 |
-|---|---|---|---|---|
-| 33 | /system | 无（跳过） | 26 张 | PEM |
-| 34 | /apex | 有 | 26 张 | PEM |
-| 35 | /apex | 有 | 26 张 | PEM |
-| 36 | /apex | 有 | 26 张 | PEM |
+早期版本曾声称 A14/15/16 走同一段代码、因此"全版本可用"；在 A14/15 上实测 Flutter 仍然抓不到，
+v1.8.0 尝试的 A14/15 修复方案也无效，已经**回退**。现状：
 
-也就是说 A14（34）、A15（35）、A16（36）在模块里是**完全一样**的路径：
-- 合并仓库（APEX 系统证书 + 用户证书 + 自定义证书，统一 PEM）
-- 写模块 overlay 发布到 `/system/etc/security/cacerts`
-- tmpfs + bind 发布到 `/apex/com.android.conscrypt/cacerts`
-- `service.sh` 常驻 nsenter 注入
+| 版本 | 证书迁移 | Flutter 抓包 |
+|---|---|---|
+| Android 7-13 | 可用（`/system` 一条路径） | 证书格式修复（PEM + hash 名）生效，但未逐版本验证 |
+| **Android 14 / 15** | 可以迁移证书 | ❌ **未修复、未验证**，请用旧版 `MoveCertificate-v1.5.6.zip` |
+| **Android 16** | 可用（`/system` + APEX） | ✅ 已修复，真机抓包成功 |
 
-A7-A13（sdk <= 33）没有 APEX，只走 `/system` 这一条，同样会被修好（PEM 转换 + hash 文件名）。
+模块对 `sdk >= 34` 的发布逻辑相同（合并仓库 → `/system` overlay → APEX tmpfs + bind → `service.sh`
+nsenter 注入），但**代码相同不等于在 A14/15 上有效**：`/apex` 的实际挂载/传播、apexd 激活时序、
+root 管理器（Magisk / KernelSU）的差异都会让证书到不了 app 的 namespace。本分支没有处理这些差异，
+因此不要把它当作 A14/15 的解决方案。
+
+`tools/version-matrix.sh` 只能证明"文件被写进了模块目录 / 暂存目录"，**不能证明 app 里看得到证书**，
+不要再把这个矩阵当作 A14/15 可用的证据。
 
 ## 六、真机验证（Android 16）
 

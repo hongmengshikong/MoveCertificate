@@ -1,3 +1,15 @@
+### v1.7.1-flutter16（文档修订 / 回退）
+
+**明确范围：只修 Android 16 的 Flutter 抓包；撤回 v1.8.0 的 A14/15 修复**
+
+* v1.8.0 尝试的「Android 14 / 15 抓不到包」修复在真机上**实测无效**，
+  代码已整体回退到 v1.7.1（版本号 / versionCode 保持 v1.7.1 / 32）。
+* 文档中删除了「A14/15/16 全版本可用」的说法：
+  * Flutter 抓包修复**只针对 Android 16（SDK 36）**，并在 Android 16 真机上验证；
+  * **Android 14 / 15 未修复、未验证**，请继续使用旧版 `MoveCertificate-v1.5.6.zip`。
+* `tools/version-matrix.sh` 的结论仅代表"证书文件被写入"，不代表 app 命名空间里可见，文档已注明。
+* 只改了文档与打包说明，模块运行逻辑与 v1.7.1 完全一致。
+
 ### v1.7.1-flutter16（fork）
 
 **重做 WebUI（参考 AlwaysStrong 的视觉语言）+ 实时状态页**

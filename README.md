@@ -2,10 +2,11 @@
 
 [English](README.en.md) | [Türkçe](README.tr.md)
 
-这是一个 `Magisk/KernelSU/APatch` 模块，用于把用户证书移动到系统证书库，支持 `Android 7-16`（含 Android 16 / Flutter）。
+这是一个 `Magisk/KernelSU/APatch` 模块，用于把用户证书移动到系统证书库，支持 `Android 7-16`。
 
-> **本分支（v1.7.0-flutter16）重点修复：Android 16 上 Flutter/Dart 应用抓不到包。**
-> 修复内容见下面「Flutter / Android 16 抓包」章节与 [FORK-FIX.md](FORK-FIX.md)。
+> **本分支（v1.7.x-flutter16）只做一件事：修 Android 16 上 Flutter/Dart 应用抓不到包。**
+> **Android 14 / 15 不在修复范围内**（实测无效、未验证）；A14/15 请继续使用旧版
+> `MoveCertificate-v1.5.6.zip`。修复原理见下面「Flutter / Android 16 抓包」与 [FORK-FIX.md](FORK-FIX.md)。
 
 # 原理（为什么以前 Android 14+ 的模块对 Flutter 无效）
 
@@ -47,28 +48,21 @@ X509_LOOKUP_add_dir(lookup, path, X509_FILETYPE_PEM);   // 只按 PEM 解析
 2. **全部统一转成 PEM**（文件名保持 `<hash>.0`）；
 3. 通过模块 overlay 发布到 `/system/etc/security/cacerts`（Flutter 老路径，对所有 app 进程可见）；
 4. 通过 tmpfs + bind 发布到 `/apex/com.android.conscrypt/cacerts`（Java 路径）；
-5. `service.sh` 常驻，用 `nsenter` 把 APEX 目录注入到 zygote / usap / 已运行的 app 进程的 mount namespace —— 解决 Android 14/15/16 上 `/apex` 私有传播导致「证书只在 root shell 里能看到，app 里看不到」的问题。
+5. `service.sh` 常驻，用 `nsenter` 把 APEX 目录注入到 zygote / usap / 已运行的 app 进程的 mount namespace —— 解决 Android 16 上 `/apex` 私有传播导致「证书只在 root shell 里能看到，app 里看不到」的问题（A14/15 未验证）。
 
 # 版本支持
 
-本分支不是只给 Android 16 的，**Android 7 - 16 全版本支持**，代码按 `ro.build.version.sdk` 分支：
+**证书迁移**本身是 A7-A16 通用的；但**本分支的 Flutter 抓包修复只针对 Android 16**。
 
-| 版本 | 系统证书来源 | 发布的路径 | 额外动作 |
-|---|---|---|---|
-| Android 7-13（sdk <= 33） | `/system/etc/security/cacerts` | 模块 overlay → `/system/etc/security/cacerts`（overlay 不生效时 bind 兜底） | 无（没有 APEX） |
-| **Android 14/15/16（sdk >= 34）** | `/apex/com.android.conscrypt/cacerts` | 同上 **+** APEX 两条路径 | tmpfs + bind，并对 zygote/usap/app 进程做 nsenter 注入 |
+| 版本 | 证书迁移 | Flutter 抓包 |
+|---|---|---|
+| Android 7-13（sdk <= 33） | 可用（模块 overlay → `/system/etc/security/cacerts`，overlay 不生效时 bind 兜底） | 证书格式修复（DER → PEM、hash 文件名）全版本生效，但未逐个版本验证 |
+| **Android 14 / 15（sdk 34 / 35）** | 可以迁移证书 | ❌ **本分支未修复、实测抓不到**，请使用旧版 `MoveCertificate-v1.5.6.zip` |
+| **Android 16（sdk 36）** | 可用 | ✅ 已修复，并在真机上验证 |
 
-Flutter/Dart 的证书格式修复（DER → PEM、hash 文件名）是**全版本生效**的，
-因为 Dart 的 BoringSSL 在 A7-A16 上读证书的方式完全一样。
-
-版本矩阵自测（`tools/version-matrix.sh`，同一套脚本跑 sdk=33/34/35/36）：
-
-```
-sdk=33  seed_source=/system  apex_install=0  legacy_overlay=26  user_cert=PEM
-sdk=34  seed_source=/apex    apex_install=1  legacy_overlay=26  user_cert=PEM
-sdk=35  seed_source=/apex    apex_install=1  legacy_overlay=26  user_cert=PEM
-sdk=36  seed_source=/apex    apex_install=1  legacy_overlay=26  user_cert=PEM
-```
+> 为什么只修 16：A14+ 的 `/apex` 私有传播、apexd 激活时序、root 管理器（Magisk / KernelSU）行为
+> 在不同版本上差异很大。本分支没有能力覆盖 A14/15 的这些差异，因此只保证 Android 16 上的行为，
+> 不做"全版本可用"的承诺。
 
 > `builtin`（纯 overlay、不挂载）模式在 A7-A13 完全可用；
 > 在 A14+ 上 `$MODDIR/apex` 不一定被 magisk/kernelsu 挂载，
@@ -133,14 +127,18 @@ adb push c8750f0d.0 /data/local/tmp/cert/
 
 # Flutter / Android 16 抓包
 
-本版本（v1.7.x）针对 Android 16 的修复点：
+> **适用范围：仅 Android 16（SDK 36）。** Android 14 / 15 上 Flutter 抓不到包的问题
+> **本分支没有修复**（v1.8.0 那套 A14/15 方案实测无效，已回退）；A14/15 请用旧版
+> `MoveCertificate-v1.5.6.zip`。
+
+本版本（v1.7.x）针对 **Android 16** 的修复点：
 
 1. **证书格式**：合并仓库统一 PEM（Android 用户证书是 DER，Flutter 读不了）。
 2. **老路径**：`/system/etc/security/cacerts` 改由模块 overlay 提供（magic mount / overlayfs），不再依赖 post-fs-data 里的 bind 是否传播到 app 命名空间；overlay 没生效时还会自动 bind 兜底。
 3. **新路径**：`service.sh` 常驻注入 `/apex/com.android.conscrypt/cacerts` 到 zygote / usap / 已运行 app 的 namespace，并在 zygote 重启后自动重新注入。
 4. **诊断**：新增 `action.sh`，在 KernelSU/APatch 里点 Action 会输出证书数量、两条路径是否带上了你的证书、注入状态；日志在 `/data/adb/modules/MoveCertificate/install.log`，状态快照在 `status.txt`。
 
-验证过的事实（用真实的 Dart VM + BoringSSL 跑过）：
+验证过的事实（用真实的 Dart VM + BoringSSL 跑过，并在 Android 16 真机上抓包成功）：
 
 | 证书目录内容 | Flutter/Dart 结果 |
 |---|---|
@@ -152,6 +150,8 @@ adb push c8750f0d.0 /data/local/tmp/cert/
 
 # 排查方法
 
+0. **先确认系统版本**：设置 → 关于手机，Android 版本必须是 **16**。Android 14 / 15 请直接换回
+   `MoveCertificate-v1.5.6.zip`，本分支在 A14/15 上不保证有效。
 1. 点模块 **Action**（KernelSU / APatch），看输出里的：
    * `cert store`：仓库证书数量（正常 100+）
    * `probe cert`：你装的那张证书（探针）
@@ -171,6 +171,9 @@ adb push c8750f0d.0 /data/local/tmp/cert/
 ./buildzip.sh all   # 需要 node/npm 编译 WebUI
 ./buildzip.sh sweb  # 跳过 WebUI 编译
 ```
+
+> Windows 上打包请先确认 `*.sh` 是 **LF** 换行：CRLF 的 `post-fs-data.sh` 在设备上会报
+> `then\r: not found`，整份脚本直接失效（可在 WSL 里 `sed -i 's/\r$//' *.sh sh/*.sh` 后再打包）。
 
 # 使用实测
 ![2024-02-19_01.27.27](README.assets/2024-02-19_01.27.27.png)

@@ -3,10 +3,11 @@
 [中文](README.md) | [Türkçe](README.tr.md)
 
 A `Magisk/KernelSU/APatch` module that moves user certificates into the system trust store.
-Supports `Android 7-16`, including `Android 16` with `Flutter/Dart` apps.
+Supports `Android 7-16`.
 
-> **This fork (v1.7.0-flutter16) fixes "Flutter apps can't be intercepted on Android 16".**
-> See [FORK-FIX.md](FORK-FIX.md) for the full root-cause analysis.
+> **This fork (v1.7.x-flutter16) only fixes "Flutter apps can't be intercepted on Android 16".**
+> **Android 14 / 15 are NOT covered** (the attempted fix did not work and was reverted); use the old
+> `MoveCertificate-v1.5.6.zip` on A14/15. See [FORK-FIX.md](FORK-FIX.md) for the root-cause analysis.
 
 # Why Flutter could not be intercepted before
 
@@ -27,8 +28,16 @@ The module now:
 3. publishes it to `/system/etc/security/cacerts` through the module overlay (visible to every app namespace),
 4. publishes it to `/apex/com.android.conscrypt/cacerts` through a tmpfs bind,
 5. keeps a `service.sh` supervisor that `nsenter`s the APEX directory into zygote / usap / already-running app
-   mount namespaces (on Android 14/15/16 `/apex` is mounted with MS_PRIVATE, so bind mounts made in init's
-   namespace do not always reach running apps).
+   mount namespaces (on Android 16 `/apex` is mounted with MS_PRIVATE, so bind mounts made in init's
+   namespace do not always reach running apps; A14/15 is unverified).
+
+# Version scope
+
+| Android | Certificate move | Flutter interception |
+|---|---|---|
+| 7–13 | works (module overlay / tmpfs + bind) | format fix (DER → PEM, hash file name) applies, not per-version verified |
+| **14 / 15** | works | ❌ **not fixed by this fork**, use `MoveCertificate-v1.5.6.zip` |
+| **16** | works | ✅ fixed and verified on a real device |
 
 # Usage
 
