@@ -1,23 +1,13 @@
 /**
- * MoveCertificate — 主入口文件
- * 负责整个页面的初始化、Tab 切换、事件协调，以及语言切换
- * 
- * 页面有四个 Tab（底部标签栏）：
- *   1. 证书管理 — 显示模块信息和证书列表（默认显示）
- *   2. 模式配置 — 查看和切换运行模式
- *   3. 运行日志 — 查看模块运行日志
- *   4. 设置 — 语言与主题（纯静态页面）
- * 
- * 数据加载策略（避免不必要的重复请求）：
- *   - 版本信息：静态数据，只加载一次
- *   - 证书列表：切换 Tab 不重复加载；点击"刷新证书列表"按钮才重新拉取
- *   - 模式配置：切换 Tab 不重复读取，只在首次进入时从文件读取
- *   - 运行日志：切换 Tab 不重复加载；点击"刷新日志"按钮才重新拉取
+ * MoveCertificate WebUI — 应用入口（新版界面）
+ *
+ * 页面结构：顶部栏 + Hero + 分组卡片 + 底部导航 + 底部弹层
+ * 数据来源：kernelsu 的 exec() 读取模块文件 / 运行只读状态脚本
  */
 
-import { fullScreen, toast } from 'kernelsu';
-import { t, getLang, setLang, LANG_LABELS } from './i18n.js';
-import type { LangCode, I18nKey } from './i18n.js';
+import { fullScreen, toast as ksuToast } from 'kernelsu';
+import { t, getLang, setLang, clearLang, isAutoLang, LANG_LABELS, supportedLangs } from './i18n.js';
+import type { LangCode } from './i18n.js';
 import {
     getVersionInfo,
     getLoggerInfo,
@@ -25,421 +15,449 @@ import {
     deleteCert,
     getCurrentMode,
     setMode,
+    getStatus,
 } from './cert-service.js';
 import {
-    renderVersionInfo,
-    renderLogInfo,
+    renderChips,
+    renderStatusCard,
     renderCertList,
-    renderModeConfig,
+    renderModeSection,
+    renderLog,
+    renderLangSheet,
+    setLangLabel,
     showSkeleton,
     hideSkeleton,
 } from './ui-renderer.js';
-import type { SwitchModeHandler, DeleteHandler } from './ui-renderer.js';
-import { createModal } from './modal.js';
-import type { ModalController } from './modal.js';
-import { initTheme, bindThemeButtons } from './theme.js';
-import type { RunMode } from './constants.js';
+import type { LangOption } from './ui-renderer.js';
+import { icon, setIcon } from './icons.js';
+import { initTheme, bindThemeSeg } from './theme.js';
+import type { RunMode, ModuleStatus, CertEntry } from './constants.js';
 
-// ==================== Tab 名称类型 ====================
+// ==================== 状态 ====================
 
 type TabName = 'certs' | 'mode' | 'log' | 'settings';
 
-// ==================== 页面状态 ====================
+const state: {
+    tab: TabName;
+    mode: RunMode;
+    version: string;
+    name: string;
+    status: ModuleStatus | null;
+    certs: CertEntry[];
+    logLines: string[];
+    certsLoaded: boolean;
+    modeLoaded: boolean;
+    logLoaded: boolean;
+} = {
+    tab: 'certs',
+    mode: 'compatible',
+    version: '',
+    name: '',
+    status: null,
+    certs: [],
+    logLines: [],
+    certsLoaded: false,
+    modeLoaded: false,
+    logLoaded: false,
+};
 
-/** 证书列表是否已加载过（切换 Tab 不重复加载，点刷新按钮才强制更新） */
-let certsLoaded = false;
-/** 版本信息是否已加载过（静态数据，只加载一次） */
-let versionLoaded = false;
-/** 模式配置是否已加载过（切换 Tab 不重复读取） */
-let modeLoaded = false;
-/** 日志是否已加载过（懒加载标志位） */
-let logLoaded = false;
-/** 当前生效的运行模式（与 mode.conf 保持一致） */
-let currentMode: RunMode = 'compatible';
-/** 删除确认弹窗（页面初始化时创建一次，不随列表刷新重复创建） */
-let deleteModal: ModalController | null = null;
+const TAB_TITLES: Record<TabName, () => string> = {
+    certs: () => t('certsTab'),
+    mode: () => t('modeTab'),
+    log: () => t('logTab'),
+    settings: () => t('setTab'),
+};
 
-// ==================== i18n：翻译页面上的静态文字 ====================
+/** 语言选项（flags 用 emoji，避免额外资源） */
+const LANGS: LangOption[] = [
+    { code: 'auto', name: '', native: '', flag: '🌐' },
+    { code: 'zh-CN', name: '中文', native: 'zh-CN', flag: '🇨🇳' },
+    { code: 'en', name: 'English', native: 'en', flag: '🇬🇧' },
+    { code: 'tr', name: 'Türkçe', native: 'tr', flag: '🇹🇷' },
+];
 
-/**
- * 把页面上所有带 data-i18n 属性的元素的文字替换为当前语言的翻译
- * 这包括标题、标签栏按钮、模态框文字、分组框标题等
- */
-function applyI18n(): void {
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        if (key) {
-            // data-i18n 的值来自 HTML 模板，类型上做一次断言
-            el.textContent = t(key as I18nKey);
-        }
-    });
+// ==================== 小工具 ====================
 
-    // 更新自定义语言选择器的显示文字和激活选项
-    const langText = document.getElementById('langSelectedText');
-    if (langText) {
-        langText.textContent = LANG_LABELS[getLang()];
-    }
-    document.querySelectorAll<HTMLElement>('.custom-select-option').forEach(opt => {
-        const lang = opt.getAttribute('data-lang') as LangCode;
-        opt.classList.toggle('active', lang === getLang());
-    });
+function $(id: string): HTMLElement | null {
+    return document.getElementById(id);
 }
 
-// ==================== 语言切换 ====================
-
-/**
- * 切换语言
- * setLang 内部会同步翻译状态，这里只需刷新页面上的静态文字
- */
-function switchLanguage(code: LangCode): void {
-    setLang(code);
-    applyI18n();
-
-    // 模式配置页的内容由 JS 动态生成，切换语言后需要重新渲染
-    const modeTab = document.getElementById('tab-mode');
-    if (modeTab && modeTab.classList.contains('active')) {
-        renderModeConfig('modeConfig', currentMode, switchModeHandler);
-    }
-
-    // 更新按钮文字（这些按钮没有 data-i18n，需要手动更新）
-    updateButtonTexts();
+function setText(id: string, text: string): void {
+    const el = $(id);
+    if (el) el.textContent = text;
 }
 
-/**
- * 更新按钮文字（这些按钮没有 data-i18n，需要手动更新）
- */
-function updateButtonTexts(): void {
-    const refreshCertsBtn = document.getElementById('refreshCertsBtn');
-    if (refreshCertsBtn) {
-        refreshCertsBtn.textContent = t('refreshCerts');
-    }
-    const refreshLogBtn = document.getElementById('refreshLogBtn');
-    if (refreshLogBtn) {
-        refreshLogBtn.textContent = t('refreshLog');
-    }
-}
-
-// ==================== Tab 切换逻辑 ====================
-
-/**
- * 切换当前显示的 Tab 页面
- * 同时更新底部标签栏滑动指示器的位置
- */
-function switchTab(tabName: TabName): void {
-    // 1. 隐藏所有 Tab 页面
-    document.querySelectorAll<HTMLElement>('.tab-page').forEach(page => {
-        page.classList.remove('active');
-    });
-
-    // 2. 显示目标 Tab 页面（触发 CSS 进入动画）
-    const targetPage = document.getElementById('tab-' + tabName);
-    if (targetPage) {
-        // 强制回流后添加 active 类以触发动画
-        void targetPage.offsetWidth;
-        targetPage.classList.add('active');
-    }
-
-    // 3. 更新底部标签栏高亮 + 更新滑动指示器位置
-    document.querySelectorAll<HTMLElement>('.tab-item').forEach((item) => {
-        item.classList.toggle('active', item.getAttribute('data-tab') === tabName);
-    });
-
-    // 更新 CSS 变量驱动滑动指示器
-    const tabBar = document.querySelector<HTMLElement>('.tab-bar');
-    if (tabBar) {
-        // 用 getBoundingClientRect 计算指示器的精确位置
-        const activeTab = tabBar.querySelector<HTMLElement>('.tab-item.active');
-        if (activeTab) {
-            const tabRect = activeTab.getBoundingClientRect();
-            const barRect = tabBar.getBoundingClientRect();
-            // 指示器宽度 24px，居中对齐按钮中心
-            const indicatorLeft = (tabRect.left - barRect.left) + tabRect.width / 2 - 12;
-            tabBar.style.setProperty('--indicator-left', indicatorLeft + 'px');
-        }
-    }
-}
-
-// ==================== 各 Tab 的数据加载 ====================
-
-/**
- * 加载模块版本信息（静态数据，只加载一次）
- */
-async function loadVersionInfo(): Promise<void> {
-    if (versionLoaded) {
+let toastTimer = 0;
+function showToast(msg: string): void {
+    const el = $('toast');
+    if (!el) {
+        ksuToast(msg);
         return;
     }
+    el.textContent = msg;
+    el.classList.add('show');
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => el.classList.remove('show'), 1900);
+}
 
-    showSkeleton('versionInfo', 1);
+/** 把 data-i18n 的静态文字替换成当前语言 */
+function applyI18n(): void {
+    document.querySelectorAll<HTMLElement>('[data-i18n]').forEach((el) => {
+        const key = el.getAttribute('data-i18n');
+        if (key) el.textContent = t(key);
+    });
+}
+
+// ==================== 确认弹窗 ====================
+
+interface ConfirmOptions {
+    title: string;
+    message: string;
+    iconName?: string;
+    info?: boolean;
+    danger?: boolean;
+    okText?: string;
+    onOk: () => void | Promise<void>;
+}
+
+let closeConfirm: (() => void) | null = null;
+
+function openConfirm(opts: ConfirmOptions): void {
+    const modal = $('confirmModal');
+    const ico = $('confirmIcon');
+    const title = $('confirmTitle');
+    const msg = $('confirmMessage');
+    const ok = $('confirmOk') as HTMLButtonElement | null;
+    const cancel = $('confirmCancel') as HTMLButtonElement | null;
+    if (!modal || !ok || !cancel) return;
+
+    if (ico) {
+        ico.className = 'modal-ico' + (opts.info ? ' info' : '');
+        ico.innerHTML = icon(opts.iconName || (opts.info ? 'layers' : 'trash'), 26);
+    }
+    if (title) title.textContent = opts.title;
+    if (msg) msg.textContent = opts.message;
+
+    ok.textContent = opts.okText || t('confirm');
+    ok.className = 'btn' + (opts.danger ? ' danger' : '');
+
+    const close = (): void => {
+        modal.classList.remove('open');
+        ok.onclick = null;
+    };
+    closeConfirm = close;
+
+    ok.onclick = async (): Promise<void> => {
+        close();
+        try {
+            await opts.onOk();
+        } catch (e) {
+            console.error(e);
+        }
+    };
+    cancel.onclick = close;
+    modal.onclick = (e: MouseEvent): void => {
+        if (e.target === modal) close();
+    };
+
+    modal.classList.add('open');
+}
+
+// ==================== 数据加载 ====================
+
+async function loadVersion(): Promise<void> {
     try {
         const lines = await getVersionInfo();
-        // 先移除骨架屏再渲染：hideSkeleton 会清空容器，顺序不能反
-        hideSkeleton('versionInfo');
-        renderVersionInfo('versionInfo', lines);
-        versionLoaded = true;
-    } catch (e) {
-        console.error('加载版本信息失败:', e);
-        hideSkeleton('versionInfo');
-        renderVersionInfo('versionInfo', [t('getVersionInfoFailed')]);
-    }
-}
-
-/**
- * 加载证书列表
- * @param force 为 true 时强制重新拉取（刷新按钮使用）；
- *              否则已有数据时直接跳过（切换 Tab 使用，不重复请求）
- */
-async function loadCertList(force = false): Promise<void> {
-    if (!force && certsLoaded) {
-        return; // 已有数据，切换 Tab 时直接展示，不重复请求
-    }
-
-    showSkeleton('certificateList', 4);
-    try {
-        const certs = await getInstallCertResults();
-        certsLoaded = true;
-        // 先移除骨架屏再渲染：hideSkeleton 会清空容器，顺序不能反
-        hideSkeleton('certificateList');
-        if (certs.length === 0) {
-            toast(t('noCertFound'));
+        for (const line of lines) {
+            const i = line.indexOf('=');
+            if (i < 0) continue;
+            const key = line.slice(0, i).trim();
+            const val = line.slice(i + 1).trim();
+            if (key === 'version') state.version = val;
+            if (key === 'name') state.name = val;
         }
-        renderCertList('certificateList', certs, handleDelete);
+        setText('versionValue', state.version || '—');
     } catch (e) {
-        console.error('加载证书列表失败:', e);
-        // 失败时重置标记：删除后刷新失败会导致列表与实际状态不一致，切换 Tab 时自动重试
-        certsLoaded = false;
-        hideSkeleton('certificateList');
-        // 保留页面已有内容，不破坏已显示的数据
-        toast(t('getCertListFailed'));
+        console.error('读取版本信息失败:', e);
+        setText('versionValue', t('getVersionInfoFailed'));
     }
 }
 
-/**
- * 加载证书管理页的数据（版本信息 + 证书列表）
- * 两者互不依赖，并行加载
- */
-async function loadCertsTab(): Promise<void> {
-    await Promise.all([loadVersionInfo(), loadCertList()]);
+function renderHero(): void {
+    const st = state.status;
+    const modeLabel = state.mode === 'compatible' ? t('compatibleMode') : t('builtinMode');
+    const chips = [{ text: modeLabel, cls: 'accent', icon: 'layers' }];
+
+    if (st && st.ok) {
+        chips.push({ text: t('chipCerts', String(st.store)), cls: 'good', icon: 'shield' });
+        const ok = st.probeSystem || st.probeApex;
+        chips.push({ text: ok ? t('certActive') : t('certInactive'), cls: ok ? 'good' : 'warn', icon: ok ? 'check' : 'info' });
+    }
+    renderChips('heroChips', chips);
 }
 
-/**
- * 加载模式配置页的数据
- * 只在首次进入时从文件读取，切换 Tab 不重复读取
- */
-async function loadModeTab(): Promise<void> {
-    if (modeLoaded) {
-        return;
-    }
+async function loadCerts(force = false): Promise<void> {
+    if (!force && state.certsLoaded) return;
 
-    showSkeleton('modeConfig', 2);
+    showSkeleton('statusCard', 6);
+    showSkeleton('certificateList', 3);
+
+    let status: ModuleStatus | null = null;
+    let certs: CertEntry[] = [];
+    let mode: RunMode = state.mode;
+
     try {
-        currentMode = await getCurrentMode();
-        modeLoaded = true;
+        [status, certs] = await Promise.all([
+            getStatus(),
+            getInstallCertResults().catch(() => [] as CertEntry[]),
+        ]);
+        mode = await getCurrentMode().catch(() => state.mode);
     } catch (e) {
-        console.error('加载模式配置失败:', e);
-        toast(t('loadFailedRoot'));
-    } finally {
-        hideSkeleton('modeConfig');
-        // 无论读取成功与否都渲染页面（失败时展示默认的兼容模式）
-        renderModeConfig('modeConfig', currentMode, switchModeHandler);
+        console.error('加载证书页失败:', e);
+        showToast(t('getCertListFailed'));
     }
+
+    state.status = status;
+    state.certs = certs;
+    state.mode = mode;
+    state.certsLoaded = true;
+
+    if (!state.version) await loadVersion();
+
+    hideSkeleton('statusCard');
+    hideSkeleton('certificateList');
+
+    renderStatusCard('statusCard', {
+        status,
+        mode,
+        version: state.version,
+        certCount: certs.length,
+    });
+    renderCertList('certificateList', certs, onDelete);
+    renderHero();
+    setText('certCount', certs.length ? String(certs.length) : '');
 }
 
-/**
- * 加载运行日志页的数据
- * 只在首次进入时读取，切换 Tab 不重复加载
- */
-async function loadLogTab(): Promise<void> {
-    if (logLoaded) {
-        return;
+async function loadMode(force = false): Promise<void> {
+    if (!force && state.modeLoaded) return;
+    try {
+        state.mode = await getCurrentMode();
+    } catch (e) {
+        console.error('读取模式失败:', e);
     }
+    state.modeLoaded = true;
+    renderModeSection('modeConfig', state.mode, onModePick);
+}
 
+async function loadLog(force = false): Promise<void> {
+    if (!force && state.logLoaded) return;
     showSkeleton('logContent', 5);
     try {
-        const logs = await getLoggerInfo();
-        // 先移除骨架屏再渲染：hideSkeleton 会清空容器，顺序不能反
-        hideSkeleton('logContent');
-        renderLogInfo('logContent', logs.length > 0 ? logs : [t('noLog')]);
-        logLoaded = true;
+        const lines = await getLoggerInfo();
+        state.logLines = lines;
+        state.logLoaded = true;
+        renderLog('logContent', lines, 'logCount');
     } catch (e) {
-        console.error('加载日志失败:', e);
+        console.error('读取日志失败:', e);
         hideSkeleton('logContent');
-        renderLogInfo('logContent', [t('getLogFailed')]);
+        renderLog('logContent', [t('getLogFailed')]);
+        showToast(t('getLogFailed'));
     }
 }
 
-/**
- * 刷新运行日志（点击"刷新日志"按钮时调用）
- */
-async function refreshLogTab(): Promise<void> {
-    showSkeleton('logContent', 5);
-    try {
-        const logs = await getLoggerInfo();
-        // 先移除骨架屏再渲染：hideSkeleton 会清空容器，顺序不能反
-        hideSkeleton('logContent');
-        renderLogInfo('logContent', logs.length > 0 ? logs : [t('noLog')]);
-        logLoaded = true; // 刷新成功后视为已加载，切换 Tab 不再自动重试
-    } catch (e) {
-        console.error('刷新日志失败:', e);
-        hideSkeleton('logContent');
-        renderLogInfo('logContent', [t('getLogFailed')]);
+function refreshCurrentTab(): void {
+    switch (state.tab) {
+        case 'certs':
+            state.certsLoaded = false;
+            loadCerts(true);
+            break;
+        case 'mode':
+            loadMode(true);
+            break;
+        case 'log':
+            loadLog(true);
+            break;
+        default:
+            loadVersion();
+            break;
     }
 }
 
-// ==================== 模式切换 ====================
+// ==================== 交互回调 ====================
 
-/**
- * 切换运行模式
- * 成功后在本地更新状态并重新渲染；失败只提示，不改变页面状态
- */
-const switchModeHandler: SwitchModeHandler = (newMode) => {
-    setMode(newMode).then(() => {
-        currentMode = newMode;
-        toast(t('modeSwitched', t(newMode === 'compatible' ? 'compatibleMode' : 'builtinMode')));
-        renderModeConfig('modeConfig', currentMode, switchModeHandler);
-    }).catch((e) => {
-        console.error('切换模式失败:', e);
-        toast(t('modeSwitchFailed'));
-    });
-};
-
-// ==================== 删除证书 ====================
-
-/**
- * 点击证书列表中的删除按钮：弹出确认框
- */
-const handleDelete: DeleteHandler = (fileName) => {
-    deleteModal?.show(fileName);
-};
-
-/**
- * 用户在确认框中点击"确认"后执行删除
- * 删除成功后强制重新拉取证书列表（这是用户显式操作后的必要更新）
- */
-async function confirmDeleteCert(fileName: string): Promise<void> {
-    try {
-        await deleteCert(fileName);
-        toast(t('deletedReboot', fileName));
-        await loadCertList(true);
-    } catch (e) {
-        console.error('删除证书失败:', e);
-        toast(t('deleteFailed'));
-    }
-}
-
-// ==================== 自定义语言下拉组件 ====================
-
-/**
- * 初始化自定义语言下拉组件
- */
-function initLangDropdown(): void {
-    const wrap = document.getElementById('langSelectWrap');
-    const btn = document.getElementById('langSelectBtn');
-    if (!wrap || !btn) return;
-
-    // 保存非空引用：闭包内的变量 TS 无法保持类型窄化，用别名避免到处判空
-    const wrapBox = wrap;
-
-    const groupbox = wrap.closest<HTMLElement>('.groupbox');
-
-    // 关闭下拉（同时移除 groupbox 层级提升）
-    function closeDropdown(): void {
-        wrapBox.classList.remove('open');
-        if (groupbox) {
-            groupbox.classList.remove('dropdown-open');
-        }
-    }
-
-    // 点击按钮：打开/关闭下拉
-    btn.addEventListener('click', (e: Event) => {
-        e.stopPropagation();
-        const isOpen = wrapBox.classList.toggle('open');
-        if (groupbox) {
-            groupbox.classList.toggle('dropdown-open', isOpen);
-        }
-    });
-
-    // 点击选项：切换语言
-    wrap.querySelectorAll<HTMLElement>('.custom-select-option').forEach(opt => {
-        opt.addEventListener('click', (e: Event) => {
-            e.stopPropagation();
-            const lang = opt.getAttribute('data-lang') as LangCode;
-            if (lang) {
-                switchLanguage(lang);
+function onDelete(fileName: string): void {
+    openConfirm({
+        title: t('modalTitle'),
+        message: t('confirmDeleteCert', fileName),
+        iconName: 'trash',
+        danger: true,
+        onOk: async (): Promise<void> => {
+            try {
+                await deleteCert(fileName);
+                showToast(t('deletedReboot', fileName));
+                await loadCerts(true);
+            } catch (e) {
+                console.error('删除失败:', e);
+                showToast(t('deleteFailed'));
             }
-            closeDropdown();
-        });
-    });
-
-    // 点击外部关闭下拉
-    document.addEventListener('click', () => {
-        closeDropdown();
+        },
     });
 }
 
-// ==================== 页面初始化 ====================
+function onModePick(next: RunMode): void {
+    const label = next === 'compatible' ? t('compatibleMode') : t('builtinMode');
+    openConfirm({
+        title: t('modeCurrentTitle'),
+        message: t('confirmSwitchModeMsg', label),
+        iconName: 'layers',
+        info: true,
+        danger: false,
+        onOk: async (): Promise<void> => {
+            try {
+                await setMode(next);
+                state.mode = next;
+                state.modeLoaded = true;
+                renderModeSection('modeConfig', state.mode, onModePick);
+                showToast(t('modeSwitched', label));
+            } catch (e) {
+                console.error('切换模式失败:', e);
+                showToast(t('modeSwitchFailed'));
+            }
+        },
+    });
+}
 
-/**
- * 页面加载完成后自动执行
- * 这是整个应用的入口点
- */
-window.onload = async (): Promise<void> => {
-    // 显示加载提示
-    toast(t('loadingApp'));
-    fullScreen(false);
+// ==================== 语言弹层 ====================
 
-    // 初始化 i18n：翻译页面静态文字 + 同步语言选择器
+function langOptions(): LangOption[] {
+    return LANGS.map((l) => {
+        if (l.code === 'auto') {
+            return { code: 'auto', name: t('langAuto'), native: t('langAutoSub'), flag: l.flag };
+        }
+        return l;
+    });
+}
+
+function openLangSheet(): void {
+    const sheet = $('langSheet');
+    if (!sheet) return;
+    const current = isAutoLang() ? 'auto' : getLang();
+    renderLangSheet('langSheetList', langOptions(), current, (code) => {
+        pickLang(code);
+    });
+    sheet.classList.add('open');
+}
+
+function closeLangSheet(): void {
+    const sheet = $('langSheet');
+    if (sheet) sheet.classList.remove('open');
+}
+
+function pickLang(code: string): void {
+    if (code === 'auto') {
+        clearLang();
+    } else {
+        setLang(code as LangCode);
+    }
+    closeLangSheet();
     applyI18n();
-    updateButtonTexts();
+    setLangLabel('langValue', isAutoLang() ? t('langAuto') : LANG_LABELS[getLang()]);
+    setText('topTitle', TAB_TITLES[state.tab]());
 
-    // 初始化主题
-    initTheme();
-    bindThemeButtons();
+    // 重新渲染动态内容（状态/模式/日志都是运行时生成的文字）
+    renderModeSection('modeConfig', state.mode, onModePick);
+    renderLog('logContent', state.logLines, 'logCount');
+    state.certsLoaded = false;
+    loadCerts(true);
+}
 
-    // 初始化自定义语言下拉组件
-    initLangDropdown();
+// ==================== 标签页 ====================
 
-    // 删除确认弹窗只创建一次，确认回调固定指向"删除并刷新列表"
-    deleteModal = createModal('deleteModal');
-    deleteModal.onConfirm(confirmDeleteCert);
+function switchTab(name: TabName): void {
+    state.tab = name;
 
-    // ==================== 绑定底部标签栏点击事件 ====================
-    document.querySelectorAll<HTMLElement>('.tab-item').forEach(tab => {
-        tab.addEventListener('click', () => {
-            const tabName = tab.getAttribute('data-tab') as TabName;
-            switchTab(tabName);
+    document.querySelectorAll<HTMLElement>('.tab-page').forEach((p) => p.classList.remove('active'));
+    const page = $('tab-' + name);
+    if (page) page.classList.add('active');
 
-            // 根据切换到的 Tab 加载对应数据
-            // 各加载函数内部有"已加载则跳过"的判断，切换 Tab 不会重复请求
-            switch (tabName) {
-                case 'certs':
-                    loadCertsTab();
-                    break;
-                case 'mode':
-                    loadModeTab();
-                    break;
-                case 'log':
-                    loadLogTab();
-                    break;
-                case 'settings':
-                    // 设置页是纯静态的，不需要加载数据
-                    break;
-            }
+    document.querySelectorAll<HTMLElement>('#nav .nav-item').forEach((b) => {
+        b.classList.toggle('active', b.getAttribute('data-tab') === name);
+    });
+
+    setText('topTitle', TAB_TITLES[name]());
+    window.scrollTo({ top: 0 });
+
+    if (name === 'certs') loadCerts();
+    else if (name === 'mode') loadMode();
+    else if (name === 'log') loadLog();
+}
+
+// ==================== 初始化 ====================
+
+function setupIcons(): void {
+    setIcon($('refreshTopBtn'), 'refresh', 21);
+    setIcon($('navIcoCerts'), 'shield', 22);
+    setIcon($('navIcoMode'), 'sliders', 22);
+    setIcon($('navIcoLog'), 'terminal', 22);
+    setIcon($('navIcoSet'), 'gear', 22);
+    setIcon($('refreshCertsIco'), 'refresh', 18);
+    setIcon($('refreshLogIco'), 'refresh', 18);
+    setIcon($('langTile'), 'globe', 21);
+    setIcon($('themeTile'), 'moon', 21);
+    setIcon($('versionTile'), 'info', 21);
+    setIcon($('repoTile'), 'link', 21);
+    setIcon($('upstreamTile'), 'layers', 21);
+
+    document.querySelectorAll<HTMLElement>('.chev').forEach((el) => setIcon(el, 'chevron', 18));
+
+    // 贡献者
+    const contrib = $('contributors');
+    if (contrib) {
+        const names = ['ys1231', 'SafaSafari', 'fr0stb1rd', 'RevealedSoulEven', 'shikong'];
+        contrib.innerHTML = names
+            .map((n) => `<span class="contrib"><span class="dot"></span>${n}</span>`)
+            .join('');
+    }
+}
+
+function bindEvents(): void {
+    document.querySelectorAll<HTMLElement>('#nav .nav-item').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const tab = btn.getAttribute('data-tab') as TabName;
+            if (tab) switchTab(tab);
         });
     });
 
-    // ==================== 绑定刷新按钮 ====================
-    // 只有用户主动点击刷新按钮时才重新拉取数据
-    const refreshCertsBtn = document.getElementById('refreshCertsBtn');
-    if (refreshCertsBtn) {
-        refreshCertsBtn.addEventListener('click', () => loadCertList(true));
-    }
+    $('refreshTopBtn')?.addEventListener('click', refreshCurrentTab);
+    $('refreshCertsBtn')?.addEventListener('click', () => {
+        state.certsLoaded = false;
+        loadCerts(true);
+    });
+    $('refreshLogBtn')?.addEventListener('click', () => loadLog(true));
+    $('langRow')?.addEventListener('click', openLangSheet);
+    $('langSheetClose')?.addEventListener('click', closeLangSheet);
 
-    const refreshLogBtn = document.getElementById('refreshLogBtn');
-    if (refreshLogBtn) {
-        refreshLogBtn.addEventListener('click', refreshLogTab);
-    }
+    $('langSheet')?.addEventListener('click', (e: MouseEvent) => {
+        if (e.target === $('langSheet')) closeLangSheet();
+    });
 
-    // ==================== 默认加载证书管理页 ====================
-    switchTab('certs');
-    loadCertsTab();
+    window.addEventListener('scroll', () => {
+        const bar = $('topbar');
+        if (bar) bar.classList.toggle('stuck', window.scrollY > 6);
+    }, { passive: true });
+}
+
+window.onload = async (): Promise<void> => {
+    fullScreen(false);
+    initTheme();
+    bindThemeSeg();
+    applyI18n();
+    setupIcons();
+    bindEvents();
+
+    setLangLabel('langValue', isAutoLang() ? t('langAuto') : LANG_LABELS[getLang()]);
+    setText('topTitle', TAB_TITLES[state.tab]());
+
+    await loadVersion();
+    await loadCerts();
 };

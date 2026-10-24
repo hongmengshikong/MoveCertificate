@@ -1,7 +1,11 @@
 #!/system/bin/sh
 # shellcheck shell=sh
 # ============================================================================
-# 状态报告：用于 action.sh 输出 & 写入 status.txt 便于排查
+# 状态报告
+#   - 被 post-fs-data.sh / action.sh source 时：提供 status_report / write_status
+#   - 直接执行时：
+#       sh status.sh            → 人类可读状态
+#       sh status.sh --json     → 单行 JSON（WebUI 用）
 # ============================================================================
 
 MODDIR=${MODDIR:-${0%/*}}
@@ -32,6 +36,8 @@ _content_count() {
     }
     ls -1A "$1" 2>/dev/null | wc -l | tr -d ' '
 }
+
+# ==================== 人类可读报告 ====================
 
 status_report() {
     # pick_store_probe / pick_inject_src 会设置全局变量
@@ -79,7 +85,58 @@ status_report() {
     echo "  4. Flutter 应用修改证书后需要【强杀 app 再打开】"
 }
 
+# ==================== JSON（WebUI 用） ====================
+
+status_json() {
+    pick_store_probe 2>/dev/null
+
+    local probe store system_n apex_n ps=0 pa=0 inj=0 zy=0 z t targets ver
+    probe="$STORE_PROBE"
+    store=$(store_count)
+    system_n=$(_content_count "$SYSTEM_CERT_DIR")
+    apex_n=$(_content_count "$APEX_CONSCRYPT_DIR")
+    if [ -n "$probe" ]; then
+        [ -f "$SYSTEM_CERT_DIR/$probe" ] && ps=1
+        [ -f "$APEX_CONSCRYPT_DIR/$probe" ] && pa=1
+    fi
+
+    targets=$(apex_install_targets 2>/dev/null)
+    for z in $(list_zygote_pids 2>/dev/null); do
+        zy=$((zy + 1))
+        for t in $targets; do
+            if ns_has_mount "$z" "$t" 2>/dev/null; then
+                inj=$((inj + 1))
+                break
+            fi
+        done
+    done
+
+    ver=$(grep -m1 '^version=' "$MODDIR/module.prop" 2>/dev/null | cut -d= -f2-)
+    [ -n "$ver" ] || ver="unknown"
+
+    printf '{"ok":true,"sdk":%s,"mode":"%s","store":%s,"system":%s,"apex":%s,"probe":"%s","probeSystem":%s,"probeApex":%s,"injected":%s,"zygotes":%s,"version":"%s"}\n' \
+        "${sdk_version_number:-0}" "$CURRENT_MODE" "$store" "$system_n" "$apex_n" \
+        "$probe" "$ps" "$pa" "$inj" "$zy" "$ver"
+}
+
 write_status() {
     status_report >"$MODDIR/status.txt" 2>/dev/null
     print_log "status written to $MODDIR/status.txt"
 }
+
+# ==================== 直接执行入口 ====================
+
+case "${0##*/}" in
+    status.sh)
+        MODDIR=$(cd "${0%/*}/.." 2>/dev/null && pwd)
+        . "$MODDIR/sh/common.sh"
+        . "$MODDIR/sh/store.sh"
+        . "$MODDIR/sh/inject.sh"
+        read_mode_config
+        case "$1" in
+            --json) status_json ;;
+            *) status_report ;;
+        esac
+        exit 0
+        ;;
+esac

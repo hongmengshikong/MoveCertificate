@@ -66,3 +66,36 @@ export interface CertEntry {
     status: CertStatus;
     name: string;
 }
+
+// ==================== 状态脚本 ====================
+
+/** 模块根目录 */
+export const MODULE_DIR = '/data/adb/modules/MoveCertificate';
+
+/** 只读状态脚本：`sh status.sh --json` 输出一行 JSON */
+export const STATUS_SCRIPT = `${MODULE_DIR}/sh/status.sh`;
+
+/** 状态脚本返回的数据结构 */
+export interface ModuleStatus {
+    ok: boolean;
+    sdk: number;
+    mode: RunMode;
+    /** 合并后的证书仓库数量 */
+    store: number;
+    /** /system/etc/security/cacerts 文件数 */
+    system: number;
+    /** APEX 证书目录文件数 */
+    apex: number;
+    /** 用来判断是否生效的探针证书 */
+    probe: string;
+    /** 探针是否出现在 /system 路径 */
+    probeSystem: boolean;
+    /** 探针是否出现在 APEX 路径 */
+    probeApex: boolean;
+    /** 已注入挂载的 zygote/usap 进程数 */
+    injected: number;
+    /** 检测到的 zygote/usap 进程总数 */
+    zygotes: number;
+    /** module.prop 里的版本号 */
+    version: string;
+}

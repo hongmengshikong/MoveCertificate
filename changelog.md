@@ -1,3 +1,21 @@
+### v1.7.1-flutter16（fork）
+
+**重做 WebUI（参考 AlwaysStrong 的视觉语言）+ 实时状态页**
+
+* 新界面
+  * 大标题 Hero + 状态胶囊、分组卡片、彩色图标块、底部四标签导航
+  * 深色 / 浅色 / 跟随系统三态；语言改为底部弹层（中文 / English / Türkçe / 跟随系统）
+  * 证书行：状态胶囊 + 一键删除（确认弹窗），不再需要长按
+  * 模式切换：分段控件 + 确认弹窗（写入 mode.conf）
+* 新增「模块状态」卡片
+  * 运行模式、证书仓库数量
+  * `/system/etc/security/cacerts` 与 `/apex/com.android.conscrypt/cacerts` 的探针结果
+  * 注入进程数（zygote / usap / app 命名空间）
+* `sh/status.sh` 支持直接执行
+  * `sh status.sh` → 人类可读状态
+  * `sh status.sh --json` → WebUI 使用的单行 JSON
+* 版本：v1.7.1 / versionCode 32
+
 ### v1.7.0-flutter16（fork）
 
 **修复：Android 16 上 Flutter / Dart 应用抓不到包（同时保留 A14/A15 的修复）**

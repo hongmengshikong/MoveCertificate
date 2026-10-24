@@ -51,7 +51,7 @@ zip -r "$ZIP_FILE" \
     update.json \
     cert_names.json \
     README.assets \
-    -x "buildzip.sh"
+    -x "buildzip.sh" "README.assets/webui-*.png"
 
 echo "打包完成: ${ZIP_FILE}"
 

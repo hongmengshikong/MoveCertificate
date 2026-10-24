@@ -111,7 +111,20 @@ adb push c8750f0d.0 /data/local/tmp/cert/
 
 ## 方式三：WebUI 查看 / 删除
 
-模块自带的网页可以查看已安装证书、删除证书、切换模式、查看日志（长按删除）。
+模块自带一套 WebUI（KernelSU / APatch 的模块页面里打开），v1.7.1 起重做了界面：
+大标题 + 分组卡片 + 彩色图标 + 底部导航 + 底部语言弹层，深色/浅色/跟随系统三态。
+
+<img src="README.assets/webui-certs.png" width="260" alt="证书页"> <img src="README.assets/webui-mode.png" width="260" alt="模式页"> <img src="README.assets/webui-settings.png" width="260" alt="设置页">
+
+功能：
+
+* **证书**：实时显示合并仓库里的证书，绿色「已生效」/ 橙色「未生效」，右侧垃圾桶删除（重启生效）
+* **模块状态**：运行模式、证书数量、`/system` 与 APEX 两条路径的探针结果、注入进程数
+* **模式**：兼容 / 内置分段切换（确认后写入 `mode.conf`，重启生效）
+* **日志**：直接查看 `install.log`
+* **设置**：语言（中文 / English / Türkçe / 跟随系统，底部弹层）、外观、版本与贡献者
+
+<div align="center"><img src="README.assets/webui-lang.png" width="260" alt="语言弹层"></div>
 
 ## KernelSU / APatch 用户注意
 
@@ -120,7 +133,7 @@ adb push c8750f0d.0 /data/local/tmp/cert/
 
 # Flutter / Android 16 抓包
 
-本版本（v1.7.0）针对 Android 16 的修复点：
+本版本（v1.7.x）针对 Android 16 的修复点：
 
 1. **证书格式**：合并仓库统一 PEM（Android 用户证书是 DER，Flutter 读不了）。
 2. **老路径**：`/system/etc/security/cacerts` 改由模块 overlay 提供（magic mount / overlayfs），不再依赖 post-fs-data 里的 bind 是否传播到 app 命名空间；overlay 没生效时还会自动 bind 兜底。

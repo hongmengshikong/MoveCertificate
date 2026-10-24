@@ -1,5 +1,5 @@
 {
-    "versionCode": 31,
-    "version": "v1.7.0-flutter16",
-    "changelog": "修复安卓16上 Flutter/Dart 应用抓不到包：证书统一转成 PEM、补齐 /system/etc/security/cacerts 路径、按进程注入 APEX 挂载；同时保留安卓14/15的修复。"
+    "versionCode": 32,
+    "version": "v1.7.1-flutter16",
+    "changelog": "v1.7.1：重做 WebUI（大标题/分组卡片/底部导航/语言弹层），新增实时状态页，证书一键删除。v1.7.0：修复安卓16 Flutter/Dart 抓不到包（统一转 PEM、补齐 /system 路径、按进程注入 APEX）。"
 }

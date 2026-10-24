@@ -317,6 +317,119 @@ const translations: Record<string, TranslationEntry> = {
         en: 'Contributors',
         tr: 'Katkıda Bulunanlar',
     },
+
+    // ==================== 新版界面 ====================
+    chipCerts: { 'zh-CN': '{0} 张', en: '{0} certs', tr: '{0} sertifika' },
+    logSection: { 'zh-CN': '日志内容', en: 'Log output', tr: 'Günlük çıktısı' },
+    navCerts: { 'zh-CN': '证书', en: 'Certs', tr: 'Sertifika' },
+    navMode: { 'zh-CN': '模式', en: 'Mode', tr: 'Mod' },
+    navLog: { 'zh-CN': '日志', en: 'Log', tr: 'Günlük' },
+    navSet: { 'zh-CN': '设置', en: 'Settings', tr: 'Ayarlar' },
+
+    appSubtitle: {
+        'zh-CN': '系统证书迁移 · Flutter 抓包修复',
+        en: 'System CA migration · Flutter interception fixed',
+        tr: 'Sistem CA taşıma · Flutter düzeltmesi',
+    },
+    statusSection: { 'zh-CN': '模块状态', en: 'Module status', tr: 'Modül durumu' },
+    statusMode: { 'zh-CN': '运行模式', en: 'Mode', tr: 'Çalışma modu' },
+    statusModeSubCompatible: {
+        'zh-CN': '兼容模式：模块 overlay + bind 兜底',
+        en: 'Compatible: overlay + bind fallback',
+        tr: 'Uyumlu: overlay + bind yedeği',
+    },
+    statusModeSubBuiltin: {
+        'zh-CN': '内置模式：仅依赖模块 overlay',
+        en: 'Built-in: module overlay only',
+        tr: 'Yerleşik: yalnızca modül overlay',
+    },
+    statusStore: { 'zh-CN': '证书仓库', en: 'CA store', tr: 'CA deposu' },
+    statusStoreSub: {
+        'zh-CN': '系统 + 用户 + 自定义，统一转 PEM',
+        en: 'System + user + custom, all PEM',
+        tr: 'Sistem + kullanıcı + özel, hepsi PEM',
+    },
+    statusSystem: { 'zh-CN': '系统路径', en: 'System path', tr: 'Sistem yolu' },
+    statusApex: { 'zh-CN': 'APEX 路径', en: 'APEX path', tr: 'APEX yolu' },
+    statusInject: { 'zh-CN': '注入进程', en: 'Injected', tr: 'Enjekte edilen' },
+    statusInjectSub: {
+        'zh-CN': 'zygote / usap / app 命名空间',
+        en: 'zygote / usap / app namespaces',
+        tr: 'zygote / usap / uygulama ad alanları',
+    },
+    statusProbe: { 'zh-CN': '探针证书', en: 'Probe cert', tr: 'Deneme sertifikası' },
+    statusProbeEmpty: {
+        'zh-CN': '还没有用户证书',
+        en: 'No user certificate yet',
+        tr: 'Henüz kullanıcı sertifikası yok',
+    },
+    statusUnavailable: {
+        'zh-CN': '读不到模块状态，请检查 root 权限',
+        en: 'Cannot read module status, check root',
+        tr: 'Modül durumu okunamadı, root iznini kontrol edin',
+    },
+
+    certActive: { 'zh-CN': '已生效', en: 'Active', tr: 'Etkin' },
+    certInactive: { 'zh-CN': '未生效', en: 'Inactive', tr: 'Etkin değil' },
+    certEmpty: {
+        'zh-CN': '还没有检测到证书，安装后重启即可',
+        en: 'No certificates yet. Install one and reboot.',
+        tr: 'Henüz sertifika yok. Yükleyip yeniden başlatın.',
+    },
+    unknownCert: { 'zh-CN': '未知证书', en: 'Unknown certificate', tr: 'Bilinmeyen sertifika' },
+    certFootnote: {
+        'zh-CN': '点右侧垃圾桶可删除证书，删除后重启生效',
+        en: 'Tap the bin icon to delete a certificate, reboot to apply',
+        tr: 'Silmek için çöp kutusuna dokunun, yeniden başlatın',
+    },
+    refreshCertsPlain: { 'zh-CN': '刷新证书列表', en: 'Refresh certificates', tr: 'Sertifikaları yenile' },
+    refreshLogPlain: { 'zh-CN': '刷新日志', en: 'Refresh log', tr: 'Günlüğü yenile' },
+    refreshDone: { 'zh-CN': '已刷新', en: 'Refreshed', tr: 'Yenilendi' },
+
+    modeHeroSub: {
+        'zh-CN': '选择证书的挂载方式，切换后需要重启',
+        en: 'Pick how certificates are mounted, reboot after switching',
+        tr: 'Sertifikaların bağlanma biçimini seçin, geçişten sonra yeniden başlatın',
+    },
+    modeCurrentTitle: { 'zh-CN': '当前模式', en: 'Current mode', tr: 'Geçerli mod' },
+    modeExplainTitle: { 'zh-CN': '模式说明', en: 'Mode details', tr: 'Mod ayrıntıları' },
+    modeSwitchHint: {
+        'zh-CN': '切换后需要重启设备才能生效',
+        en: 'A reboot is required after switching',
+        tr: 'Geçişten sonra yeniden başlatma gerekir',
+    },
+    confirmSwitchModeMsg: {
+        'zh-CN': '切换为 {0} 后需要重启设备，确认切换吗？',
+        en: 'Switch to {0}? A reboot is required.',
+        tr: '{0} moduna geçilsin mi? Yeniden başlatma gerekir.',
+    },
+
+    logHeroSub: {
+        'zh-CN': '每次开机写入 /data/adb/modules/MoveCertificate/install.log',
+        en: 'Written to install.log on every boot',
+        tr: 'Her açılışta install.log dosyasına yazılır',
+    },
+
+    setHeroSub: {
+        'zh-CN': '语言、外观与项目信息',
+        en: 'Language, appearance and project info',
+        tr: 'Dil, görünüm ve proje bilgisi',
+    },
+    prefsSection: { 'zh-CN': '偏好', en: 'Preferences', tr: 'Tercihler' },
+    themeSettingsSub: {
+        'zh-CN': '跟随系统 / 浅色 / 深色',
+        en: 'Auto / Light / Dark',
+        tr: 'Otomatik / Açık / Koyu',
+    },
+    moduleVersion: { 'zh-CN': '模块版本', en: 'Module version', tr: 'Modül sürümü' },
+    upstreamTitle: { 'zh-CN': '上游项目', en: 'Upstream', tr: 'Üst kaynak' },
+    languagePick: { 'zh-CN': '选择语言', en: 'Choose language', tr: 'Dil seçin' },
+    langAuto: { 'zh-CN': '跟随系统', en: 'Follow system', tr: 'Sistemi izle' },
+    langAutoSub: {
+        'zh-CN': '根据系统语言自动选择',
+        en: 'Auto-detect from system language',
+        tr: 'Sistem dilinden otomatik algıla',
+    },
 } as const;
 
 /** 所有翻译 key 的联合类型 */
@@ -365,6 +478,17 @@ export function getLang(): LangCode {
 export function setLang(code: LangCode): void {
     localStorage.setItem(STORAGE_KEY, code);
     currentLang = code;
+}
+
+/** 清除手动选择，恢复“跟随系统” */
+export function clearLang(): void {
+    localStorage.removeItem(STORAGE_KEY);
+    currentLang = getLang();
+}
+
+/** 当前是否处于“跟随系统” */
+export function isAutoLang(): boolean {
+    return !localStorage.getItem(STORAGE_KEY);
 }
 
 // ==================== 翻译函数 ====================

@@ -59,6 +59,18 @@ Common reasons it "did nothing":
    converts DER → PEM);
 4. the file isn't a CA certificate.
 
+## WebUI
+
+The module ships a WebUI (open it from the KernelSU / APatch module page). v1.7.1 redesigned it:
+
+<img src="README.assets/webui-certs.png" width="260" alt="Certificates"> <img src="README.assets/webui-mode.png" width="260" alt="Mode">
+
+* **Certificates** — live list with an Active / Inactive pill and a one-tap delete (confirm sheet)
+* **Status** — mode, store size, probe result for `/system` and APEX paths, injected process count
+* **Mode** — compatible / built-in segmented switch (writes `mode.conf`, reboot to apply)
+* **Log** — reads `install.log`
+* **Settings** — language (中文 / English / Türkçe / follow system, bottom sheet), appearance, about
+
 ## KernelSU / APatch
 
 If the target app has **"Umount modules"** enabled in its App Profile, the app cannot see the module mounts and

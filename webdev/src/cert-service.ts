@@ -23,8 +23,9 @@ import {
     CERT_QUERY_API,
     CERT_MODULE_APEX_NUM_GLOB,
     SYSTEM_CERTS_LIST_PATH,
+    STATUS_SCRIPT,
 } from './constants.js';
-import type { RunMode, CertEntry } from './constants.js';
+import type { RunMode, CertEntry, ModuleStatus } from './constants.js';
 
 // ==================== 类型定义 ====================
 
@@ -367,4 +368,28 @@ export async function getCurrentMode(): Promise<RunMode> {
  */
 export async function setMode(mode: RunMode): Promise<void> {
     await exec(`echo "mode=${mode}" > '${MODE_CONF_PATH}'`);
+}
+
+// ==================== 模块运行状态 ====================
+
+/**
+ * 读取模块运行状态
+ * 调用 sh/status.sh --json，返回一行 JSON：
+ *   sdk / mode / 各目录证书数 / 探针证书是否生效 / 注入进程数
+ * 失败（没有 root、模块未安装）返回 null，由界面提示
+ */
+export async function getStatus(): Promise<ModuleStatus | null> {
+    try {
+        const { errno, stdout } = await exec(`sh '${STATUS_SCRIPT}' --json`) as ExecResult;
+        if (errno !== 0) return null;
+        const text = String(stdout).trim();
+        if (!text) return null;
+        // 取最后一行 JSON，避免脚本里其它输出干扰
+        const line = text.split('\n').filter(Boolean).pop() || '';
+        const data = JSON.parse(line) as ModuleStatus;
+        return data && data.ok ? data : null;
+    } catch (err) {
+        console.error('读取模块状态失败:', err);
+        return null;
+    }
 }
