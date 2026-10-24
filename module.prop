@@ -1,6 +1,6 @@
 id=MoveCertificate
 name=MoveCertificate（1.5.6 逻辑 + 新 WebUI）
-version=v1.5.7-webui
+version=v1.5.7
 versionCode=24
 author=shikong（基于 ys1231 v1.5.6）
-description=基于 v1.5.6 的证书迁移逻辑（post-fs-data.sh / service.sh / customize.sh 与 v1.5.6 逐字节一致，未改动，也未新增任何脚本），只把界面换成 v1.7 的新 WebUI（证书列表、日志、设置、深色模式）。新 UI 的「模块状态」页没有后端脚本，会显示「状态不可用」。支持 Android 7-16（v1.5.6 的原始行为）。
+description=基于 v1.5.6 的证书迁移逻辑（post-fs-data.sh / service.sh / customize.sh 与 v1.5.6 逐字节一致，未改动，也未新增任何脚本），WebUI 换成 v1.7 的新界面并按 1.5.6 的能力做了裁剪：没有「模式」页（1.5.6 没有 mode.conf），也没有「模块状态」页（没有 status.sh）；保留证书列表（生效状态 / 删除）、运行日志、设置（语言 / 外观）。支持 Android 7-16（v1.5.6 的原始行为）。

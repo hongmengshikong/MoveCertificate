@@ -13,15 +13,10 @@ import {
     getLoggerInfo,
     getInstallCertResults,
     deleteCert,
-    getCurrentMode,
-    setMode,
-    getStatus,
 } from './cert-service.js';
 import {
     renderChips,
-    renderStatusCard,
     renderCertList,
-    renderModeSection,
     renderLog,
     renderLangSheet,
     setLangLabel,
@@ -31,39 +26,32 @@ import {
 import type { LangOption } from './ui-renderer.js';
 import { icon, setIcon } from './icons.js';
 import { initTheme, bindThemeSeg } from './theme.js';
-import type { RunMode, ModuleStatus, CertEntry } from './constants.js';
+import type { CertEntry } from './constants.js';
 
 // ==================== 状态 ====================
 
-type TabName = 'certs' | 'mode' | 'log' | 'settings';
+type TabName = 'certs' | 'log' | 'settings';
 
 const state: {
     tab: TabName;
-    mode: RunMode;
     version: string;
     name: string;
-    status: ModuleStatus | null;
     certs: CertEntry[];
     logLines: string[];
     certsLoaded: boolean;
-    modeLoaded: boolean;
     logLoaded: boolean;
 } = {
     tab: 'certs',
-    mode: 'compatible',
     version: '',
     name: '',
-    status: null,
     certs: [],
     logLines: [],
     certsLoaded: false,
-    modeLoaded: false,
     logLoaded: false,
 };
 
 const TAB_TITLES: Record<TabName, () => string> = {
     certs: () => t('certsTab'),
-    mode: () => t('modeTab'),
     log: () => t('logTab'),
     settings: () => t('setTab'),
 };
@@ -184,69 +172,35 @@ async function loadVersion(): Promise<void> {
 }
 
 function renderHero(): void {
-    const st = state.status;
-    const modeLabel = state.mode === 'compatible' ? t('compatibleMode') : t('builtinMode');
-    const chips = [{ text: modeLabel, cls: 'accent', icon: 'layers' }];
-
-    if (st && st.ok) {
-        chips.push({ text: t('chipCerts', String(st.store)), cls: 'good', icon: 'shield' });
-        const ok = st.probeSystem || st.probeApex;
-        chips.push({ text: ok ? t('certActive') : t('certInactive'), cls: ok ? 'good' : 'warn', icon: ok ? 'check' : 'info' });
-    }
+    // 本分支（1.5.6 逻辑）没有 mode / 状态脚本，Hero 只显示证书数量
+    const chips = [{ text: t('chipCerts', String(state.certs.length)), cls: 'good', icon: 'shield' }];
     renderChips('heroChips', chips);
 }
 
 async function loadCerts(force = false): Promise<void> {
     if (!force && state.certsLoaded) return;
 
-    showSkeleton('statusCard', 6);
     showSkeleton('certificateList', 3);
 
-    let status: ModuleStatus | null = null;
     let certs: CertEntry[] = [];
-    let mode: RunMode = state.mode;
 
     try {
-        [status, certs] = await Promise.all([
-            getStatus(),
-            getInstallCertResults().catch(() => [] as CertEntry[]),
-        ]);
-        mode = await getCurrentMode().catch(() => state.mode);
+        certs = await getInstallCertResults();
     } catch (e) {
         console.error('加载证书页失败:', e);
         showToast(t('getCertListFailed'));
     }
 
-    state.status = status;
     state.certs = certs;
-    state.mode = mode;
     state.certsLoaded = true;
 
     if (!state.version) await loadVersion();
 
-    hideSkeleton('statusCard');
     hideSkeleton('certificateList');
 
-    renderStatusCard('statusCard', {
-        status,
-        mode,
-        version: state.version,
-        certCount: certs.length,
-    });
     renderCertList('certificateList', certs, onDelete);
     renderHero();
     setText('certCount', certs.length ? String(certs.length) : '');
-}
-
-async function loadMode(force = false): Promise<void> {
-    if (!force && state.modeLoaded) return;
-    try {
-        state.mode = await getCurrentMode();
-    } catch (e) {
-        console.error('读取模式失败:', e);
-    }
-    state.modeLoaded = true;
-    renderModeSection('modeConfig', state.mode, onModePick);
 }
 
 async function loadLog(force = false): Promise<void> {
@@ -270,9 +224,6 @@ function refreshCurrentTab(): void {
         case 'certs':
             state.certsLoaded = false;
             loadCerts(true);
-            break;
-        case 'mode':
-            loadMode(true);
             break;
         case 'log':
             loadLog(true);
@@ -299,29 +250,6 @@ function onDelete(fileName: string): void {
             } catch (e) {
                 console.error('删除失败:', e);
                 showToast(t('deleteFailed'));
-            }
-        },
-    });
-}
-
-function onModePick(next: RunMode): void {
-    const label = next === 'compatible' ? t('compatibleMode') : t('builtinMode');
-    openConfirm({
-        title: t('modeCurrentTitle'),
-        message: t('confirmSwitchModeMsg', label),
-        iconName: 'layers',
-        info: true,
-        danger: false,
-        onOk: async (): Promise<void> => {
-            try {
-                await setMode(next);
-                state.mode = next;
-                state.modeLoaded = true;
-                renderModeSection('modeConfig', state.mode, onModePick);
-                showToast(t('modeSwitched', label));
-            } catch (e) {
-                console.error('切换模式失败:', e);
-                showToast(t('modeSwitchFailed'));
             }
         },
     });
@@ -364,8 +292,7 @@ function pickLang(code: string): void {
     setLangLabel('langValue', isAutoLang() ? t('langAuto') : LANG_LABELS[getLang()]);
     setText('topTitle', TAB_TITLES[state.tab]());
 
-    // 重新渲染动态内容（状态/模式/日志都是运行时生成的文字）
-    renderModeSection('modeConfig', state.mode, onModePick);
+    // 重新渲染动态内容（日志是运行时生成的文字）
     renderLog('logContent', state.logLines, 'logCount');
     state.certsLoaded = false;
     loadCerts(true);
@@ -388,7 +315,6 @@ function switchTab(name: TabName): void {
     window.scrollTo({ top: 0 });
 
     if (name === 'certs') loadCerts();
-    else if (name === 'mode') loadMode();
     else if (name === 'log') loadLog();
 }
 
@@ -397,7 +323,6 @@ function switchTab(name: TabName): void {
 function setupIcons(): void {
     setIcon($('refreshTopBtn'), 'refresh', 21);
     setIcon($('navIcoCerts'), 'shield', 22);
-    setIcon($('navIcoMode'), 'sliders', 22);
     setIcon($('navIcoLog'), 'terminal', 22);
     setIcon($('navIcoSet'), 'gear', 22);
     setIcon($('refreshCertsIco'), 'refresh', 18);

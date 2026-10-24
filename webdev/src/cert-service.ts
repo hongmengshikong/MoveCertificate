@@ -1,7 +1,7 @@
 /**
- * MoveCertificate — 数据服务层
+ * MoveCertificate — 数据服务层（v1.5.6 分支适配版）
  * 这个文件负责所有"获取数据"和"操作数据"的工作
- * 比如读证书列表、删证书、查日志、读写模式配置等
+ * 比如读证书列表、删证书、查日志
  * 
  * 约定：
  *   1. 这个文件不操作页面 DOM，也不显示任何提示（toast），只处理数据
@@ -18,14 +18,12 @@ import {
     ALL_CERT_PATHS,
     MODULE_PROP_PATH,
     INSTALL_LOG_PATH,
-    MODE_CONF_PATH,
     CERT_NAME_CACHE_PATH,
     CERT_QUERY_API,
     CERT_MODULE_APEX_NUM_GLOB,
     SYSTEM_CERTS_LIST_PATH,
-    STATUS_SCRIPT,
 } from './constants.js';
-import type { RunMode, CertEntry, ModuleStatus } from './constants.js';
+import type { CertEntry } from './constants.js';
 
 // ==================== 类型定义 ====================
 
@@ -341,55 +339,3 @@ export async function getInstallCertResults(): Promise<CertEntry[]> {
     }));
 }
 
-// ==================== 模式配置 ====================
-
-/**
- * 获取当前运行模式
- * 读取 mode.conf 文件，解析出 compatible（兼容模式）或 builtin（内置方法）
- * 文件不存在或内容无效时返回默认值 compatible（这是"默认配置"语义，不算错误）
- */
-export async function getCurrentMode(): Promise<RunMode> {
-    const { errno, stdout } = await exec(`cat '${MODE_CONF_PATH}'`) as ExecResult;
-    if (errno !== 0) {
-        return 'compatible';
-    }
-
-    const content = String(stdout).trim().toLowerCase();
-    // 从 "mode=compatible" 或 "mode=builtin" 中提取值
-    return content.includes('builtin') ? 'builtin' : 'compatible';
-}
-
-/**
- * 切换运行模式
- * 把新的模式值写入 mode.conf 文件
- * 注意：修改后需要重启设备才能生效
- * 
- * @throws 写入失败时抛出异常
- */
-export async function setMode(mode: RunMode): Promise<void> {
-    await exec(`echo "mode=${mode}" > '${MODE_CONF_PATH}'`);
-}
-
-// ==================== 模块运行状态 ====================
-
-/**
- * 读取模块运行状态
- * 调用 sh/status.sh --json，返回一行 JSON：
- *   sdk / mode / 各目录证书数 / 探针证书是否生效 / 注入进程数
- * 失败（没有 root、模块未安装）返回 null，由界面提示
- */
-export async function getStatus(): Promise<ModuleStatus | null> {
-    try {
-        const { errno, stdout } = await exec(`sh '${STATUS_SCRIPT}' --json`) as ExecResult;
-        if (errno !== 0) return null;
-        const text = String(stdout).trim();
-        if (!text) return null;
-        // 取最后一行 JSON，避免脚本里其它输出干扰
-        const line = text.split('\n').filter(Boolean).pop() || '';
-        const data = JSON.parse(line) as ModuleStatus;
-        return data && data.ok ? data : null;
-    } catch (err) {
-        console.error('读取模块状态失败:', err);
-        return null;
-    }
-}

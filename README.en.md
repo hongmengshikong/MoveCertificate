@@ -6,9 +6,11 @@ A `Magisk/KernelSU/APatch` module for moving user certificates to system certifi
 If your phone has an official image, you might need this module. If you compile your own ROM, you can either build it in or manually move it using `remount`.
 
 > **This branch forks from the `v1.5.6` release node = v1.5.6 migration logic (byte-for-byte unchanged) + the new v1.7 WebUI.**
-> `post-fs-data.sh` / `service.sh` / `customize.sh` are identical to the v1.5.6 release and no script was added;
-> only the UI was replaced, plus `cert_names.json` (a certificate-name dictionary for the UI).
-> The WebUI "Status" card has no backend script on this branch and shows "unavailable"; certs / log / settings work.
+> `post-fs-data.sh` / `service.sh` / `customize.sh` are identical to the v1.5.6 release and no script was added.
+> The WebUI is **trimmed to what v1.5.6 can actually do** (not copied as-is): the "Mode" tab was removed
+> (v1.5.6 has no `mode.conf`) and the "Module status" card was removed (there is no `sh/status.sh`).
+> Left: certificate list (active state / delete), runtime log, settings (language / theme / version).
+> `cert_names.json` is only a certificate-name dictionary for the UI.
 
 # Usage
 

@@ -27,9 +27,6 @@
                 <div class="chips" id="heroChips"></div>
             </div>
 
-            <div class="section-title"><span data-i18n="statusSection">模块状态</span></div>
-            <div class="card" id="statusCard"></div>
-
             <div class="section-title">
                 <span data-i18n="certList">证书列表</span>
                 <span class="count" id="certCount"></span>
@@ -43,15 +40,6 @@
                 <span class="btn-ico" id="refreshCertsIco"></span>
                 <span data-i18n="refreshCertsPlain">刷新证书列表</span>
             </button>
-        </section>
-
-        <!-- ==================== 模式 ==================== -->
-        <section class="tab-page" id="tab-mode">
-            <div class="hero compact">
-                <h1 class="hero-title" data-i18n="modeTab">模式配置</h1>
-                <p class="hero-sub" data-i18n="modeHeroSub">选择证书的挂载方式，切换后需重启</p>
-            </div>
-            <div id="modeConfig"></div>
         </section>
 
         <!-- ==================== 日志 ==================== -->
@@ -145,10 +133,6 @@
             <span class="nav-ico" id="navIcoCerts"></span>
             <span class="nav-label" data-i18n="navCerts">证书</span>
         </button>
-        <button class="nav-item" data-tab="mode">
-            <span class="nav-ico" id="navIcoMode"></span>
-            <span class="nav-label" data-i18n="navMode">模式</span>
-        </button>
         <button class="nav-item" data-tab="log">
             <span class="nav-ico" id="navIcoLog"></span>
             <span class="nav-label" data-i18n="navLog">日志</span>
@@ -171,7 +155,7 @@
     </div>
 </div>
 
-<!-- 确认弹窗（删除证书 / 切换模式） -->
+<!-- 确认弹窗（删除证书） -->
 <div class="modal" id="confirmModal">
     <div class="modal-card" role="dialog" aria-modal="true">
         <div class="modal-ico" id="confirmIcon"></div>

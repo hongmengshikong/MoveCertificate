@@ -45,11 +45,6 @@ const translations: Record<string, TranslationEntry> = {
         en: 'Certificates',
         tr: 'Sertifikalar',
     },
-    modeTab: {
-        'zh-CN': '模式配置',
-        en: 'Mode Config',
-        tr: 'Mod Ayarı',
-    },
     logTab: {
         'zh-CN': '运行日志',
         en: 'Runtime Log',
@@ -88,92 +83,6 @@ const translations: Record<string, TranslationEntry> = {
         tr: 'Sil',
     },
 
-    // ==================== 模式配置页 ====================
-    currentMode: {
-        'zh-CN': '当前模式',
-        en: 'Current Mode',
-        tr: 'Geçerli Mod',
-    },
-    modeDesc: {
-        'zh-CN': '当前正在使用此模式挂载证书',
-        en: 'Currently using this mode to mount certificates',
-        tr: 'Sertifikalar bu mod kullanılarak bağlanıyor',
-    },
-    switchTo: {
-        'zh-CN': '切换到 ',
-        en: 'Switch to ',
-        tr: 'Şuna geç: ',
-    },
-    modeHint: {
-        'zh-CN': '切换后需要重启设备才能生效',
-        en: 'Reboot required for changes to take effect',
-        tr: 'Değişikliklerin etkili olması için yeniden başlatma gerekli',
-    },
-    modeExplain: {
-        'zh-CN': '模式说明',
-        en: 'Mode Explanation',
-        tr: 'Mod Açıklaması',
-    },
-    compatibleMode: {
-        'zh-CN': '兼容模式',
-        en: 'Compatible Mode',
-        tr: 'Uyumlu Mod',
-    },
-    builtinMode: {
-        'zh-CN': '内置模式',
-        en: 'Built-in Mode',
-        tr: 'Yerleşik Mod',
-    },
-    compatibleTitle: {
-        'zh-CN': '🔧 兼容模式（compatible）',
-        en: '🔧 Compatible Mode',
-        tr: '🔧 Uyumlu Mod (compatible)',
-    },
-    compatibleDesc: {
-        'zh-CN': '使用 tmpfs 内存文件系统直接挂载证书目录。不依赖 Magisk 的 Magic Mount 机制，兼容性最好。',
-        en: 'Uses tmpfs memory filesystem to directly mount certificate directories. Does not rely on Magisk Magic Mount mechanism, best compatibility.',
-        tr: 'Sertifika dizinlerini doğrudan bağlamak için tmpfs bellek dosya sistemi kullanır. Magisk Magic Mount mekanizmasına bağlı değildir, en iyi uyumluluk.',
-    },
-    compatibleSuitable: {
-        'zh-CN': '适用于：',
-        en: 'Suitable for: ',
-        tr: 'Uygun olduğu: ',
-    },
-    compatibleSuitableVal: {
-        'zh-CN': 'KernelSU、APatch、Magisk 等主流 Root 方案。',
-        en: 'KernelSU, APatch, Magisk and other major root solutions.',
-        tr: 'KernelSU, APatch, Magisk ve diğer ana root çözümleri.',
-    },
-    compatibleFeature: {
-        'zh-CN': '特点：',
-        en: 'Feature: ',
-        tr: 'Özellik: ',
-    },
-    compatibleFeatureVal: {
-        'zh-CN': '稳定可靠，是模块的默认模式。',
-        en: 'Stable and reliable, the default mode of the module.',
-        tr: 'Kararlı ve güvenilir, modülün varsayılan modu.',
-    },
-    builtinTitle: {
-        'zh-CN': '📦 内置模式（builtin）',
-        en: '📦 Built-in Mode',
-        tr: '📦 Yerleşik Mod (builtin)',
-    },
-    builtinDesc: {
-        'zh-CN': '利用 Magisk 模块自身的目录结构实现挂载。依赖 Magisk 框架的 Magic Mount 功能，不需要手动执行 mount 命令。',
-        en: 'Uses Magisk module directory structure for mounting. Relies on Magisk Magic Mount, no manual mount commands needed.',
-        tr: 'Bağlama için Magisk modül dizin yapısını kullanır. Magisk Magic Mount özelliğine dayanır, manuel mount komutları gerekmez.',
-    },
-    builtinSuitableVal: {
-        'zh-CN': 'KernelSU、APatch、Magisk 等主流 Root 方案。',
-        en: 'KernelSU, APatch, Magisk and other major root solutions.',
-        tr: 'KernelSU, APatch, Magisk ve diğer ana root çözümleri.',
-    },
-    builtinFeatureVal: {
-        'zh-CN': 'Android14及以上受限于 Magic Mount 元模块挂载方案。需要搭配「Magic Mount Metamodule」+ 扩展分区 apex 可兼容,其它自行测试。',
-        en: 'Limited to Magic Mount meta module mounting scheme. Known to work with "Magic Mount Metamodule" + extended partition apex.',
-        tr: 'Magic Mount meta modül bağlama şemasıyla sınırlıdır. "Magic Mount Metamodule" + genişletilmiş bölüm apex ile uyumlu olduğu bilinmektedir.',
-    },
 
     // ==================== 运行日志页 ====================
     runtimeLog: {
@@ -250,16 +159,6 @@ const translations: Record<string, TranslationEntry> = {
         en: 'No installed certificates detected',
         tr: 'Yüklü sertifika bulunamadı',
     },
-    modeSwitched: {
-        'zh-CN': '已切换为 {0}，重启后生效',
-        en: 'Switched to {0}, reboot to take effect',
-        tr: '{0} moduna geçildi, yeniden başlatın',
-    },
-    modeSwitchFailed: {
-        'zh-CN': '切换失败，请检查 root 权限',
-        en: 'Switch failed, check root permission',
-        tr: 'Geçiş başarısız, root iznini kontrol edin',
-    },
     getVersionFailed: {
         'zh-CN': '获取系统版本失败，请检查 root 权限',
         en: 'Failed to get system version, check root permission',
@@ -322,51 +221,13 @@ const translations: Record<string, TranslationEntry> = {
     chipCerts: { 'zh-CN': '{0} 张', en: '{0} certs', tr: '{0} sertifika' },
     logSection: { 'zh-CN': '日志内容', en: 'Log output', tr: 'Günlük çıktısı' },
     navCerts: { 'zh-CN': '证书', en: 'Certs', tr: 'Sertifika' },
-    navMode: { 'zh-CN': '模式', en: 'Mode', tr: 'Mod' },
     navLog: { 'zh-CN': '日志', en: 'Log', tr: 'Günlük' },
     navSet: { 'zh-CN': '设置', en: 'Settings', tr: 'Ayarlar' },
 
     appSubtitle: {
-        'zh-CN': '系统证书迁移 · Flutter 抓包修复',
-        en: 'System CA migration · Flutter interception fixed',
-        tr: 'Sistem CA taşıma · Flutter düzeltmesi',
-    },
-    statusSection: { 'zh-CN': '模块状态', en: 'Module status', tr: 'Modül durumu' },
-    statusMode: { 'zh-CN': '运行模式', en: 'Mode', tr: 'Çalışma modu' },
-    statusModeSubCompatible: {
-        'zh-CN': '兼容模式：模块 overlay + bind 兜底',
-        en: 'Compatible: overlay + bind fallback',
-        tr: 'Uyumlu: overlay + bind yedeği',
-    },
-    statusModeSubBuiltin: {
-        'zh-CN': '内置模式：仅依赖模块 overlay',
-        en: 'Built-in: module overlay only',
-        tr: 'Yerleşik: yalnızca modül overlay',
-    },
-    statusStore: { 'zh-CN': '证书仓库', en: 'CA store', tr: 'CA deposu' },
-    statusStoreSub: {
-        'zh-CN': '系统 + 用户 + 自定义，统一转 PEM',
-        en: 'System + user + custom, all PEM',
-        tr: 'Sistem + kullanıcı + özel, hepsi PEM',
-    },
-    statusSystem: { 'zh-CN': '系统路径', en: 'System path', tr: 'Sistem yolu' },
-    statusApex: { 'zh-CN': 'APEX 路径', en: 'APEX path', tr: 'APEX yolu' },
-    statusInject: { 'zh-CN': '注入进程', en: 'Injected', tr: 'Enjekte edilen' },
-    statusInjectSub: {
-        'zh-CN': 'zygote / usap / app 命名空间',
-        en: 'zygote / usap / app namespaces',
-        tr: 'zygote / usap / uygulama ad alanları',
-    },
-    statusProbe: { 'zh-CN': '探针证书', en: 'Probe cert', tr: 'Deneme sertifikası' },
-    statusProbeEmpty: {
-        'zh-CN': '还没有用户证书',
-        en: 'No user certificate yet',
-        tr: 'Henüz kullanıcı sertifikası yok',
-    },
-    statusUnavailable: {
-        'zh-CN': '读不到模块状态，请检查 root 权限',
-        en: 'Cannot read module status, check root',
-        tr: 'Modül durumu okunamadı, root iznini kontrol edin',
+        'zh-CN': '系统证书迁移',
+        en: 'System CA migration',
+        tr: 'Sistem CA taşıma',
     },
 
     certActive: { 'zh-CN': '已生效', en: 'Active', tr: 'Etkin' },
@@ -385,24 +246,6 @@ const translations: Record<string, TranslationEntry> = {
     refreshCertsPlain: { 'zh-CN': '刷新证书列表', en: 'Refresh certificates', tr: 'Sertifikaları yenile' },
     refreshLogPlain: { 'zh-CN': '刷新日志', en: 'Refresh log', tr: 'Günlüğü yenile' },
     refreshDone: { 'zh-CN': '已刷新', en: 'Refreshed', tr: 'Yenilendi' },
-
-    modeHeroSub: {
-        'zh-CN': '选择证书的挂载方式，切换后需要重启',
-        en: 'Pick how certificates are mounted, reboot after switching',
-        tr: 'Sertifikaların bağlanma biçimini seçin, geçişten sonra yeniden başlatın',
-    },
-    modeCurrentTitle: { 'zh-CN': '当前模式', en: 'Current mode', tr: 'Geçerli mod' },
-    modeExplainTitle: { 'zh-CN': '模式说明', en: 'Mode details', tr: 'Mod ayrıntıları' },
-    modeSwitchHint: {
-        'zh-CN': '切换后需要重启设备才能生效',
-        en: 'A reboot is required after switching',
-        tr: 'Geçişten sonra yeniden başlatma gerekir',
-    },
-    confirmSwitchModeMsg: {
-        'zh-CN': '切换为 {0} 后需要重启设备，确认切换吗？',
-        en: 'Switch to {0}? A reboot is required.',
-        tr: '{0} moduna geçilsin mi? Yeniden başlatma gerekir.',
-    },
 
     logHeroSub: {
         'zh-CN': '每次开机写入 /data/adb/modules/MoveCertificate/install.log',
