@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="auto">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#000000">
+    <title>MoveCertificate</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+
+<div class="app">
+
+    <!-- 顶部栏：滚动后显示当前页标题 + 快捷操作 -->
+    <header class="topbar" id="topbar">
+        <div class="topbar-title" id="topTitle">MoveCertificate</div>
+        <button class="iconbtn" id="refreshTopBtn" aria-label="refresh"></button>
+    </header>
+
+    <main class="content">
+
+        <!-- ==================== 证书 ==================== -->
+        <section class="tab-page active" id="tab-certs">
+            <div class="hero">
+                <h1 class="hero-title">MoveCertificate</h1>
+                <p class="hero-sub" data-i18n="appSubtitle">系统证书迁移 · Flutter 抓包修复</p>
+                <div class="chips" id="heroChips"></div>
+            </div>
+
+            <div class="section-title"><span data-i18n="statusSection">模块状态</span></div>
+            <div class="card" id="statusCard"></div>
+
+            <div class="section-title">
+                <span data-i18n="certList">证书列表</span>
+                <span class="count" id="certCount"></span>
+            </div>
+            <div class="card">
+                <ul class="list" id="certificateList"></ul>
+            </div>
+            <p class="footnote" data-i18n="certFootnote">点右侧垃圾桶可删除证书，删除后重启生效</p>
+
+            <button class="btn ghost" id="refreshCertsBtn">
+                <span class="btn-ico" id="refreshCertsIco"></span>
+                <span data-i18n="refreshCertsPlain">刷新证书列表</span>
+            </button>
+        </section>
+
+        <!-- ==================== 模式 ==================== -->
+        <section class="tab-page" id="tab-mode">
+            <div class="hero compact">
+                <h1 class="hero-title" data-i18n="modeTab">模式配置</h1>
+                <p class="hero-sub" data-i18n="modeHeroSub">选择证书的挂载方式，切换后需重启</p>
+            </div>
+            <div id="modeConfig"></div>
+        </section>
+
+        <!-- ==================== 日志 ==================== -->
+        <section class="tab-page" id="tab-log">
+            <div class="hero compact">
+                <h1 class="hero-title" data-i18n="logTab">运行日志</h1>
+                <p class="hero-sub" data-i18n="logHeroSub">模块每次开机写入 /data/adb/modules/MoveCertificate/install.log</p>
+            </div>
+            <div class="section-title"><span data-i18n="logSection">日志内容</span><span class="count" id="logCount"></span></div>
+            <div class="card logcard">
+                <pre class="log" id="logContent" data-i18n="logPlaceholder">点击右上角刷新按钮加载日志…</pre>
+            </div>
+            <button class="btn ghost" id="refreshLogBtn">
+                <span class="btn-ico" id="refreshLogIco"></span>
+                <span data-i18n="refreshLogPlain">刷新日志</span>
+            </button>
+        </section>
+
+        <!-- ==================== 设置 ==================== -->
+        <section class="tab-page" id="tab-settings">
+            <div class="hero compact">
+                <h1 class="hero-title" data-i18n="setTab">设置</h1>
+                <p class="hero-sub" data-i18n="setHeroSub">语言、外观与项目信息</p>
+            </div>
+
+            <div class="section-title"><span data-i18n="prefsSection">偏好</span></div>
+            <div class="card">
+                <div class="row" id="langRow" role="button" tabindex="0">
+                    <div class="tile t-blue" id="langTile"></div>
+                    <div class="txt">
+                        <div class="t" data-i18n="languageSettings">语言</div>
+                        <div class="s" id="langValue">中文</div>
+                    </div>
+                    <div class="chev"></div>
+                </div>
+                <div class="row">
+                    <div class="tile t-violet" id="themeTile"></div>
+                    <div class="txt">
+                        <div class="t" data-i18n="themeSettings">外观</div>
+                        <div class="s" data-i18n="themeSettingsSub">跟随系统 / 浅色 / 深色</div>
+                    </div>
+                </div>
+                <div class="row pad-seg">
+                    <div class="seg" id="themeSeg">
+                        <button data-theme="auto" data-i18n="themeAuto">跟随系统</button>
+                        <button data-theme="light" data-i18n="themeLight">浅色</button>
+                        <button data-theme="dark" data-i18n="themeDark">深色</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-title"><span data-i18n="aboutSection">关于</span></div>
+            <div class="card">
+                <div class="row">
+                    <div class="tile t-teal" id="versionTile"></div>
+                    <div class="txt">
+                        <div class="t" data-i18n="moduleVersion">模块版本</div>
+                        <div class="s" id="versionValue">—</div>
+                    </div>
+                </div>
+                <a class="row linkrow" href="https://github.com/hongmengshikong/MoveCertificate" target="_blank" rel="noopener">
+                    <div class="tile t-slate" id="repoTile"></div>
+                    <div class="txt">
+                        <div class="t">GitHub</div>
+                        <div class="s">hongmengshikong/MoveCertificate</div>
+                    </div>
+                    <div class="chev"></div>
+                </a>
+                <div class="row">
+                    <div class="tile t-orange" id="upstreamTile"></div>
+                    <div class="txt">
+                        <div class="t" data-i18n="upstreamTitle">上游项目</div>
+                        <div class="s">ys1231/MoveCertificate</div>
+                    </div>
+                    <div class="chev"></div>
+                </div>
+            </div>
+
+            <div class="section-title"><span data-i18n="contributorsTitle">贡献者</span></div>
+            <div class="card">
+                <div class="row contrib-row" id="contributors"></div>
+            </div>
+            <p class="footnote center">MoveCertificate · GPL-3.0</p>
+        </section>
+
+    </main>
+
+    <!-- 底部导航 -->
+    <nav class="nav" id="nav">
+        <button class="nav-item active" data-tab="certs">
+            <span class="nav-ico" id="navIcoCerts"></span>
+            <span class="nav-label" data-i18n="navCerts">证书</span>
+        </button>
+        <button class="nav-item" data-tab="mode">
+            <span class="nav-ico" id="navIcoMode"></span>
+            <span class="nav-label" data-i18n="navMode">模式</span>
+        </button>
+        <button class="nav-item" data-tab="log">
+            <span class="nav-ico" id="navIcoLog"></span>
+            <span class="nav-label" data-i18n="navLog">日志</span>
+        </button>
+        <button class="nav-item" data-tab="settings">
+            <span class="nav-ico" id="navIcoSet"></span>
+            <span class="nav-label" data-i18n="navSet">设置</span>
+        </button>
+    </nav>
+
+</div>
+
+<!-- 语言选择弹层 -->
+<div class="sheet-wrap" id="langSheet">
+    <div class="sheet" role="dialog" aria-modal="true">
+        <div class="sheet-grip"></div>
+        <h3 data-i18n="languagePick">选择语言</h3>
+        <div class="sheet-list" id="langSheetList"></div>
+        <button class="btn ghost" id="langSheetClose" data-i18n="cancel">取消</button>
+    </div>
+</div>
+
+<!-- 确认弹窗（删除证书 / 切换模式） -->
+<div class="modal" id="confirmModal">
+    <div class="modal-card" role="dialog" aria-modal="true">
+        <div class="modal-ico" id="confirmIcon"></div>
+        <h2 id="confirmTitle" data-i18n="modalTitle">此操作不可逆</h2>
+        <p id="confirmMessage" data-i18n="confirmDeleteMsg">确认要删除这个证书吗？</p>
+        <div class="modal-actions">
+            <button class="btn ghost" id="confirmCancel" data-i18n="cancel">取消</button>
+            <button class="btn danger" id="confirmOk" data-i18n="confirm">确认</button>
+        </div>
+    </div>
+</div>
+
+<!-- 轻提示 -->
+<div class="toast" id="toast"></div>
+
+<script src="src/main.ts" type="module"></script>
+</body>
+</html>

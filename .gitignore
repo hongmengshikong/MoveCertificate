@@ -1,8 +1,6 @@
 *.zip
 .DS_Store
-webdev
 webroot
 .idea
 node_modules
-package-lock.json
 .cache

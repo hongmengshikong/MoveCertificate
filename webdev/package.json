@@ -1,0 +1,28 @@
+{
+  "name": "movecertificate",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node build.mjs --serve",
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "build_push": "node build.mjs && scp ../webroot/*  root@192.168.1.10:/data/adb/modules/MoveCertificate/webroot/ && echo '✅ 构建并推送完成'",
+    "push": "scp ../webroot/*  root@192.168.1.10:/data/adb/modules/MoveCertificate/webroot/",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "private": true,
+  "dependencies": {
+    "kernelsu": "^3.0.2"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1",
+    "javascript-obfuscator": "^5.4.3",
+    "typescript": "^6.0.3"
+  },
+  "keywords": [],
+  "author": "iyue",
+  "license": "ISC",
+  "description": "The MoveCertificate web page is used to display and delete certificates.",
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

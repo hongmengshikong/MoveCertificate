@@ -5,6 +5,11 @@
 A `Magisk/KernelSU/APatch` module for moving user certificates to system certificates. Supports `Android 7-16`.
 If your phone has an official image, you might need this module. If you compile your own ROM, you can either build it in or manually move it using `remount`.
 
+> **This branch forks from the `v1.5.6` release node = v1.5.6 migration logic (byte-for-byte unchanged) + the new v1.7 WebUI.**
+> `post-fs-data.sh` / `service.sh` / `customize.sh` are identical to the v1.5.6 release and no script was added;
+> only the UI was replaced, plus `cert_names.json` (a certificate-name dictionary for the UI).
+> The WebUI "Status" card has no backend script on this branch and shows "unavailable"; certs / log / settings work.
+
 # Usage
 
 1. After exporting the certificate, simply `push` it to your phone and install it normally through system settings, then restart. No format conversion needed.

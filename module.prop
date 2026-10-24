@@ -1,7 +1,6 @@
 id=MoveCertificate
-name=MoveCertificate
-version=v1.5.5
-versionCode=22
-author=Contributors
-description=Supports magiskv20.4+/kernelsu/APatch Android 7-15 move certificates
-updateJson=https://pfile.ys1231.cn/modules/MoveCertificate/update.json
+name=MoveCertificate（1.5.6 逻辑 + 新 WebUI）
+version=v1.5.7-webui
+versionCode=24
+author=shikong（基于 ys1231 v1.5.6）
+description=基于 v1.5.6 的证书迁移逻辑（post-fs-data.sh / service.sh / customize.sh 与 v1.5.6 逐字节一致，未改动，也未新增任何脚本），只把界面换成 v1.7 的新 WebUI（证书列表、日志、设置、深色模式）。新 UI 的「模块状态」页没有后端脚本，会显示「状态不可用」。支持 Android 7-16（v1.5.6 的原始行为）。
