@@ -2,73 +2,97 @@
 
 [中文](README.md) | [Türkçe](README.tr.md)
 
-A `Magisk/KernelSU/APatch` module for moving user certificates to system certificates. Supports `Android 7-16`.
-If your phone has an official image, you might need this module. If you compile your own ROM, you can either build it in or manually move it using `remount`.
+A `Magisk/KernelSU/APatch` module that moves user certificates into the system trust store.
+Supports `Android 7-16`, including `Android 16` with `Flutter/Dart` apps.
+
+> **This fork (v1.7.0-flutter16) fixes "Flutter apps can't be intercepted on Android 16".**
+> See [FORK-FIX.md](FORK-FIX.md) for the full root-cause analysis.
+
+# Why Flutter could not be intercepted before
+
+| Who reads it | Directory | Accepted format |
+|---|---|---|
+| Java / Conscrypt | `/apex/com.android.conscrypt/cacerts` (A14+), fallback `/system/etc/security/cacerts` | PEM or DER |
+| **Flutter / Dart (BoringSSL in libflutter.so)** | old engines: `/system/etc/security/cacerts` only; new engines: the APEX dir first | **PEM only**, file name must be `<subject_hash_old>.0` |
+
+Dart calls `SSL_CTX_load_verify_locations(ctx, NULL, dir)` and BoringSSL registers that directory with
+`X509_LOOKUP_add_dir(lookup, path, X509_FILETYPE_PEM)` — i.e. a **hashed directory of PEM files**.
+DER files (what Android writes into `/data/misc/user/0/cacerts-added`) are silently ignored, and files whose
+name is not the subject hash are never looked up.
+
+The module now:
+
+1. merges *system + user + custom* certificates into one store,
+2. converts everything to **PEM** (keeping the `<hash>.0` name),
+3. publishes it to `/system/etc/security/cacerts` through the module overlay (visible to every app namespace),
+4. publishes it to `/apex/com.android.conscrypt/cacerts` through a tmpfs bind,
+5. keeps a `service.sh` supervisor that `nsenter`s the APEX directory into zygote / usap / already-running app
+   mount namespaces (on Android 14/15/16 `/apex` is mounted with MS_PRIVATE, so bind mounts made in init's
+   namespace do not always reach running apps).
 
 # Usage
 
-- Prefer installing through system settings, no need to deal with encoding issues
+## 1) Install through system settings (recommended)
 
-1. After exporting the certificate, simply `push` it to your phone and install it normally through system settings, then restart. No format conversion needed.
-2. Can be used with [appproxy](https://github.com/ys1231/appproxy) VPN proxy tool.
+Settings → Security → Encryption & credentials → Install a certificate → CA certificate, pick the proxy CA,
+then **reboot** (or press the module's **Action** button in KernelSU/APatch).
 
-## Manual Certificate Installation to System Certificate Directory
+Android stores it as `/data/misc/user/0/cacerts-added/<hash>.0` in DER; the module converts it to PEM
+automatically — you don't have to convert anything manually.
 
-- **This method will overwrite existing certificates, designed for multiple computers and built-in certificates**
-- Normally, this scenario is not needed.
-- The HASH.0 directly exported by Reqable may not always work. It is recommended to export the crt and install it normally through system settings, or use the commands below to convert it. Otherwise, even if the certificate file is moved successfully, the system won't recognize it due to encoding issues.
+## 2) Push to `/data/local/tmp/cert` (for many devices / baked-in CA)
 
-0. If the certificate has been moved before or built into the source code, you'll find that direct installation through the system doesn't actually install the certificate. This scenario needs to be preserved.
-
-1. Export the packet capture software certificate and convert it to pem format
-2. Get the der certificate
+The directory is re-imported on every boot **and** whenever you press Action.
 
 ```shell
-# For pem certificates (Android system uses der, so the moved certificate needs to be converted to der)
-## 1. Calculate pem
-openssl x509 -inform PEM -subject_hash_old -in cacert.pem
-## 2. Convert to der
-openssl x509 -in cacert.pem -outform der -out cacert.der
-### Or from crt
-openssl x509 -in cacert.crt -outform der -out cacert.der
-mv cacert.der 02e06844.0
-
-# For der certificates
-## 1. Calculate der 
-openssl x509 -in cacert.der -inform der -subject_hash_old -noout
-## 2. Rename certificate to hash.0
-mv cacert.der 02e06844.0
-# Or directly extract the certificate from the user directory after installing it on the phone, no need to worry about calculation and format conversion.
+openssl x509 -in cacert.pem -noout -subject_hash_old      # e.g. c8750f0d
+cp cacert.pem c8750f0d.0                                  # PEM is best; DER also accepted
+adb push c8750f0d.0 /data/local/tmp/cert/
+# then reboot (or press Action)
 ```
 
-![20221109212126575](README.assets/20221109212126575.png)
+Common reasons it "did nothing":
 
-3. Get the der certificate `02e06844.0`, or coexist as `02e06844.1`
-4. `adb push 02e06844.0  /data/local/tmp/cert/`
-5. Restart and it's done.
+1. no reboot / no Action press — the directory is only imported at boot or on Action;
+2. wrong file name — it must be `<subject_hash_old>.0`, otherwise Flutter will never find it;
+3. wrong format — older versions asked for DER, but **Flutter only parses PEM** (this build accepts both and
+   converts DER → PEM);
+4. the file isn't a CA certificate.
 
-## MoveCertificate web
+## KernelSU / APatch
 
-- A web page for the MoveCertificate module to display the list of installed certificates.
-- It can also view detailed information about certificates installed by the module.
-- Long press to delete installed certificates.
+If the target app has **"Umount modules"** enabled in its App Profile, the app cannot see the module mounts and
+interception will always fail. Disable it for that app (or globally).
 
-# Build Command
+# Verification performed
+
+Real Dart VM (same BoringSSL code path as `libflutter.so`), connecting to a local HTTPS server signed by the
+test CA:
+
+| CA directory content | Result |
+|---|---|
+| `<hash>.0` + DER (raw Android user cert) | ❌ `CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate` |
+| `<hash>.0` + PEM (converted by this module) | ✅ HTTP 200 |
+| PEM with a non-hash file name | ❌ not found |
+
+If a Flutter app still can't be intercepted after this, the app is doing **SSL pinning** inside
+`libflutter.so` — that is a different problem (hook `ssl_verify_cert_chain` / `SSL_CTX_set_custom_verify`).
+
+# Build
+
 ```shell
-./buildzip.sh all
+./buildzip.sh all    # builds the WebUI too (node/npm required)
+./buildzip.sh sweb   # skip the WebUI build
 ```
 
 # Test Results
 ![2024-02-19_01.27.27](README.assets/2024-02-19_01.27.27.png)
 
-## Star History
-
-[![Star History Chart](https://star-history.dera.page/svg?repos=ys1231/MoveCertificate&type=Date)](https://star-history.dera.page/#ys1231/MoveCertificate&Date)
-
-# References:
+# References
 - http://www.zhuoyue360.com/crack/60.html
 - https://topjohnwu.github.io/Magisk/guides.html#boot-scripts
 - https://github.com/Magisk-Modules-Repo/movecert
-- https://github.com/andyacer/movecert
-- https://book.hacktricks.xyz/v/cn/mobile-pentesting/android-app-pentesting/install-burp-certificate#android-14-zhi-hou 
-- https://kernelsu.org/zh_CN/guide/module.html 
+- https://book.hacktricks.xyz/v/cn/mobile-pentesting/android-app-pentesting/install-burp-certificate#android-14-zhi-hou
+- https://kernelsu.org/zh_CN/guide/module.html
+- https://github.com/dart-lang/sdk/blob/main/runtime/bin/security_context_linux.cc
+- https://github.com/google/boringssl/blob/master/crypto/x509/x509_d2.cc

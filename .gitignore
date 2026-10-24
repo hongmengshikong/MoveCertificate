@@ -10,3 +10,12 @@ node_modules
 .claude
 .parcel-cache
 .actrc
+
+# 运行期产物（安装/开机时生成，不提交）
+mode.conf
+install.log
+status.txt
+system_certs.txt
+certificates/
+system/
+apex/

@@ -1,73 +1,26 @@
 #!/system/bin/sh
-MODDIR=${0%/*}
+# shellcheck shell=sh
+# ============================================================================
+# 兼容模式（tmpfs + bind 挂载）
+# ----------------------------------------------------------------------------
+# 具体实现已统一到 sh/store.sh 的 install_compatible_mode()，
+# 这里只保留旧的函数名，避免旧脚本 / 旧调用方式失效。
+# ============================================================================
 
-# 使用兼容模式
+MODDIR=${MODDIR:-${0%/*}}
 
+# Android 13 及以下
 init_low_version() {
-
-    # Android 13 or lower versions perform
-    print_log "Use tmpfs $SYSTEM_CERT_DIR"
-    print_log "Backup $SYSTEM_CERT_DIR"
-    cp -u $SYSTEM_CERT_DIR/* $MODULE_CERT_DIR
-    print_log "Backup $USER_CERT_DIR"
-    cp -u $USER_CERT_DIR/* $MODULE_CERT_DIR
-
-    move_custom_cert
-    fix_user_permissions
-    compatible
-    selinux_context=$(ls -Zd $SYSTEM_CERT_DIR | awk '{print $1}')
-    mount -t tmpfs tmpfs $SYSTEM_CERT_DIR
-    print_log "mount $SYSTEM_CERT_DIR status:$?"
-    
-    cp -f $MODULE_CERT_DIR/* $SYSTEM_CERT_DIR
-    
-    print_log "Install $SYSTEM_CERT_DIR status:$?"
-    fix_system_permissions $SYSTEM_CERT_DIR
-    print_log "certificates installed"
-    [ "$(getenforce)" = "Enforcing" ] || return 0
-    default_selinux_context=u:object_r:system_security_cacerts_file:s0
-    if [ -n "$selinux_context" ] && [ "$selinux_context" != "?" ]; then
-        chcon -R $selinux_context $SYSTEM_CERT_DIR
-    else
-        chcon -R $default_selinux_context $SYSTEM_CERT_DIR
-    fi
+    install_compatible_mode
 }
 
+# Android 14 及以上
+init_high_version() {
+    install_compatible_mode
+}
 
-init_high_version(){
-
-    print_log "Use mount $TEMP_DIR"
-    mkdir -p $TEMP_DIR
-    print_log "Backup $APEX_CONSCRYPT_DIR"
-    cp -u $APEX_CONSCRYPT_DIR/* $MODULE_CERT_DIR
-    print_log "Backup $USER_CERT_DIR"
-    cp -u $USER_CERT_DIR/* $MODULE_CERT_DIR
-    move_custom_cert
-    fix_user_permissions
-    fix_system_permissions14 $MODULE_CERT_DIR
-    compatible
-    
-    print_log "find system conscrypt directory"
-    apex_dir=$(find /apex -type d -name "com.android.conscrypt@*" 2>/dev/null | head -n1)
-    print_log "find conscrypt directory: $apex_dir"
-
-    mount -t tmpfs tmpfs $TEMP_DIR
-    print_log "mount $TEMP_DIR status:$?"
-    cp -f $MODULE_CERT_DIR/* $TEMP_DIR
-    fix_system_permissions14 $TEMP_DIR
-    # set_selinux_context $APEX_CONSCRYPT_DIR $MODULE_CERT_DIR
-    set_selinux_context $APEX_CONSCRYPT_DIR $TEMP_DIR
-
-    # These two directories are mapped to the same block
-    mount -o bind $TEMP_DIR $APEX_CONSCRYPT_DIR
-    print_log "mount bind $TEMP_DIR $APEX_CONSCRYPT_DIR status:$?"
-    mount -o bind $TEMP_DIR $apex_dir/cacerts
-    print_log "mount bind $TEMP_DIR $apex_dir/cacerts status:$?"
-    for pid in 1 $(pgrep zygote) $(pgrep zygote64); do
-            nsenter --mount=/proc/${pid}/ns/mnt -- mount --bind $TEMP_DIR $APEX_CONSCRYPT_DIR
-            nsenter --mount=/proc/${pid}/ns/mnt -- mount --bind $TEMP_DIR $apex_dir/cacerts
-    done
-    # umount $TEMP_DIR
-    # rmdir $TEMP_DIR
-    # print_log "umount $TEMP_DIR status:$?"
+# 旧函数：把证书目录 bind 到 /system/etc/security/cacerts
+# 现在默认走模块 overlay（magic mount），只有 overlay 没生效时才 bind
+mount_legacy_cacerts_dir() {
+    install_legacy_store 1
 }

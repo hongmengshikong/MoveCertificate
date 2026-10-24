@@ -1,7 +1,6 @@
 id=MoveCertificate
-name=MoveCertificate
-version=v1.6.2
-versionCode=28
-author=Contributors
-description=Supports magiskv20.4+/kernelsu/APatch Android 7-16 move certificates
-updateJson=https://pfile.ys1231.cn/modules/MoveCertificate/update.json
+name=MoveCertificate 证书迁移（Flutter / 安卓16 修复）
+version=v1.7.0-flutter16
+versionCode=31
+author=shikong（基于 ys1231 修改）
+description=把用户证书迁移到系统证书库，支持安卓 7-16。本版修复：① 合并「系统+用户+自定义」证书并统一转成 PEM（Flutter/Dart 的 BoringSSL 只识别 PEM 哈希目录，DER 会被静默忽略）；② 用模块 overlay 把证书发布到 /system/etc/security/cacerts（Flutter 老路径），overlay 未生效时自动 bind 兜底；③ 对 zygote/usap/app 进程做 nsenter 注入，解决安卓 14-16 /apex 私有传播导致 app 内看不到证书的问题。支持 Magisk / KernelSU / APatch。

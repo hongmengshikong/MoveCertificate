@@ -1,42 +1,43 @@
 #!/system/bin/sh
-# Do NOT assume where your module will be located.
-# ALWAYS use $MODDIR if you need to know where this script
-# and module is placed.
-# This will make sure your module will still work
-# if Magisk change its mount point in the future
+# ============================================================================
+# MoveCertificate - post-fs-data
+# ----------------------------------------------------------------------------
+# 开机早期执行，负责：
+#   1. 组装合并证书仓库（系统证书 + 用户证书 + 自定义证书，统一 PEM）
+#   2. 发布到 /system/etc/security/cacerts （模块 overlay，Flutter 老路径）
+#   3. 发布到 /apex/com.android.conscrypt/cacerts （tmpfs + bind，Java 路径）
+# ============================================================================
+
 MODDIR=${0%/*}
 
-. $MODDIR/sh/common.sh
-. $MODDIR/sh/built-in.sh
-. $MODDIR/sh/compatible.sh
-. $MODDIR/sh/refresh.sh
+. "$MODDIR/sh/common.sh"
+. "$MODDIR/sh/store.sh"
+. "$MODDIR/sh/inject.sh"
+. "$MODDIR/sh/compatible.sh"
+. "$MODDIR/sh/built-in.sh"
+. "$MODDIR/sh/refresh.sh"
+. "$MODDIR/sh/status.sh"
 
-print_log "start move cert !"
-print_log "current sdk version is $sdk_version_number"
+log_reset
+print_log "=== MoveCertificate post-fs-data start ==="
+print_log "sdk=$sdk_version_number"
 
-# 读取模式配置
 read_mode_config
-print_log "current mode is $CURRENT_MODE"
+print_log "mode=$CURRENT_MODE"
 
-# 清理 builtin 模式遗留的挂载目录文件
 clean_builtin_leftovers
-
-# 记录系统原始证书列表
 record_system_certs
 
-# Android version <= 13 execute
-if [ "$sdk_version_number" -le 33 ]; then
+if prepare_cert_store; then
     if [ "$CURRENT_MODE" = "builtin" ]; then
-        init_low_builtin_method
+        install_builtin_mode
     else
-        init_low_version
+        install_compatible_mode
     fi
+    print_log "certificates installed"
 else
-    if [ "$CURRENT_MODE" = "builtin" ]; then
-        init_high_builtin_method
-    else
-        init_high_version
-    fi
+    print_log "ERROR: cert store not ready, skip install (system CA keeps untouched)"
 fi
 
-print_log "certificates installed"
+write_status
+print_log "=== MoveCertificate post-fs-data end ==="

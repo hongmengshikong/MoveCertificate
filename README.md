@@ -2,61 +2,163 @@
 
 [English](README.en.md) | [Türkçe](README.tr.md)
 
-这是一个`Magisk/KernelSU/APatch`模块 用于移动用户证书到系统证书.支持`Android 7-16`
-如果手机是官方镜像,可能就需要借助模块,如果是自己编译的直接内置或者`remount`手动移一下就行了.
+这是一个 `Magisk/KernelSU/APatch` 模块，用于把用户证书移动到系统证书库，支持 `Android 7-16`（含 Android 16 / Flutter）。
 
-# 使用方法 
+> **本分支（v1.7.0-flutter16）重点修复：Android 16 上 Flutter/Dart 应用抓不到包。**
+> 修复内容见下面「Flutter / Android 16 抓包」章节与 [FORK-FIX.md](FORK-FIX.md)。
 
-- 优先使用系统设置安装, 不需要处理编码问题
+# 原理（为什么以前 Android 14+ 的模块对 Flutter 无效）
 
-1. 导出证书后直接`push`到手机,使用系统设置正常安装证书,完了重启即可,不需要格式转换.
-2. 可搭配 [appproxy](https://github.com/ys1231/appproxy) vpn代理工具.
+| 使用方 | 读取哪个目录 | 需要的文件格式 |
+|---|---|---|
+| Java / OkHttp / Conscrypt | Android 14+ 读 `/apex/com.android.conscrypt/cacerts`，再回退 `/system/etc/security/cacerts` | PEM 或 DER 都行 |
+| **Flutter / Dart（libflutter.so 里的 BoringSSL）** | 老引擎只读 `/system/etc/security/cacerts`；新引擎优先读 `/apex/com.android.conscrypt/cacerts` | **只能是 PEM，且文件名必须是 `<subject_hash_old>.0`** |
 
+Dart 的 `security_context_linux.cc` 里是这样加载根证书的：
 
-## 手动安装证书到系统证书目录
-
-- **此方法会覆盖已有的证书，专为多台电脑和内置证书准备**
-- 正常情况下,不需要此场景.
-- Reqable 直接导出的HASH.0 不一定能用, 建议导出crt, 使用系统设置正常安装或使用下面命令转换否则即使证书文件移动成功, 因为编码问题系统也无法识别
-
-0. 如果证书已经移动过或者内置到源码中，会发现直接通过系统安装，实际证书并没有被安装进去，需要保留这种场景
-1. 导出抓包软件证书 转换 证书为 pem 格式
-2. 获取 der 证书 
-
-```shell
-# pem 证书 Android 系统使用 der 所以移动后的证书格式需要转成 der
-## 1. 计算 pem
-openssl x509 -inform PEM -subject_hash_old -in cacert.pem
-## 2. 转 der
-openssl x509 -in cacert.pem -outform der -out cacert.der
-### 2.1 或者 crt
-openssl x509 -in cacert.crt -outform der -out cacert.der
-mv cacert.der 02e06844.0
-
-# der 证书 
-## 1. 计算 der 
-openssl x509 -in cacert.der -inform der -subject_hash_old -noout
-## 2. 重命名证书为 hash值.0
-mv cacert.der 02e06844.0
-# 或者直接使用手机安装后,提取用户目录的证书出来,就不需要考虑计算和格式转换问题.
+```cpp
+const char* android_apex_cacerts   = "/apex/com.android.conscrypt/cacerts";
+const char* android_system_cacerts = "/system/etc/security/cacerts";
+if (Directory::Exists(nullptr, android_apex_cacerts) == Directory::EXISTS) {
+  LoadRootCertCache(android_apex_cacerts);   // SSL_CTX_load_verify_locations(ctx, NULL, dir)
+} else {
+  LoadRootCertCache(android_system_cacerts);
+}
 ```
 
-![20221109212126575](README.assets/20221109212126575.png)
+而 BoringSSL 的 hash 目录是这么注册的（`crypto/x509/x509_d2.cc`）：
 
-3. 获取到 der 格式证书`02e06844.0`,或者共存`02e06844.1`
-4. `adb push 02e06844.0  /data/local/tmp/cert/`
-5. 重启即可
-
-## MoveCertificate web
-
-- 这是一个 web 网页用于 MoveCertificate 模块显示已安装的证书列表。
-- 同时也可以查看模块安装证书的详细信息。
-- 以及长按可以删除已安装的证书。
-
-# 打包命令
-```shell
-./buildzip.sh all
+```cpp
+X509_LOOKUP_add_dir(lookup, path, X509_FILETYPE_PEM);   // 只按 PEM 解析
 ```
+
+所以：
+
+* **DER 证书会被 Flutter 静默忽略**（Java 能读，Flutter 读不到）。
+* 文件名不是 `<hash>.0` 的证书 Flutter 也找不到。
+* 目录不在 app 的 mount namespace 里，Flutter 同样读不到（`/apex` 是 MS_PRIVATE 挂载）。
+
+而 Android 在设置里安装的用户证书，`/data/misc/user/0/cacerts-added/<hash>.0` 写的是 **DER**（AOSP `TrustedCertificateStore.writeCertificate()` 里 `os.write(cert.getEncoded())`）。旧版模块直接把这些 DER 文件复制到系统证书目录，于是：
+**Java 应用能抓包，Flutter 应用抓不到** —— 这正是本分支要修的问题。
+
+本模块现在会：
+
+1. 把「系统证书 + 用户证书 + 自定义证书」合并成一份仓库；
+2. **全部统一转成 PEM**（文件名保持 `<hash>.0`）；
+3. 通过模块 overlay 发布到 `/system/etc/security/cacerts`（Flutter 老路径，对所有 app 进程可见）；
+4. 通过 tmpfs + bind 发布到 `/apex/com.android.conscrypt/cacerts`（Java 路径）；
+5. `service.sh` 常驻，用 `nsenter` 把 APEX 目录注入到 zygote / usap / 已运行的 app 进程的 mount namespace —— 解决 Android 14/15/16 上 `/apex` 私有传播导致「证书只在 root shell 里能看到，app 里看不到」的问题。
+
+# 版本支持
+
+本分支不是只给 Android 16 的，**Android 7 - 16 全版本支持**，代码按 `ro.build.version.sdk` 分支：
+
+| 版本 | 系统证书来源 | 发布的路径 | 额外动作 |
+|---|---|---|---|
+| Android 7-13（sdk <= 33） | `/system/etc/security/cacerts` | 模块 overlay → `/system/etc/security/cacerts`（overlay 不生效时 bind 兜底） | 无（没有 APEX） |
+| **Android 14/15/16（sdk >= 34）** | `/apex/com.android.conscrypt/cacerts` | 同上 **+** APEX 两条路径 | tmpfs + bind，并对 zygote/usap/app 进程做 nsenter 注入 |
+
+Flutter/Dart 的证书格式修复（DER → PEM、hash 文件名）是**全版本生效**的，
+因为 Dart 的 BoringSSL 在 A7-A16 上读证书的方式完全一样。
+
+版本矩阵自测（`tools/version-matrix.sh`，同一套脚本跑 sdk=33/34/35/36）：
+
+```
+sdk=33  seed_source=/system  apex_install=0  legacy_overlay=26  user_cert=PEM
+sdk=34  seed_source=/apex    apex_install=1  legacy_overlay=26  user_cert=PEM
+sdk=35  seed_source=/apex    apex_install=1  legacy_overlay=26  user_cert=PEM
+sdk=36  seed_source=/apex    apex_install=1  legacy_overlay=26  user_cert=PEM
+```
+
+> `builtin`（纯 overlay、不挂载）模式在 A7-A13 完全可用；
+> 在 A14+ 上 `$MODDIR/apex` 不一定被 magisk/kernelsu 挂载，
+> 所以 A14+ 建议用默认的 `compatible` 模式。
+
+# 使用方法
+
+## 方式一：系统设置安装（推荐）
+
+1. 手机设置 → 安全 → 加密与凭据 → 安装证书 → CA 证书，选择抓包工具的证书（.crt/.pem/.cer 均可）。
+2. 安装完成后**重启**手机（或在 KernelSU/APatch 里点模块的 **Action** 按钮）。
+3. WebUI / `install.log` 里应该能看到这张证书。
+
+系统会把证书写到 `/data/misc/user/0/cacerts-added/<hash>.0`（DER），模块会自动转成 PEM 再发布，**不需要你手动转换格式**。
+
+## 方式二：手动 push 到 `/data/local/tmp/cert`（多设备 / 内置证书用）
+
+`/data/local/tmp/cert` 是模块的「自定义证书目录」，**每次开机**（或点 Action）都会重新导入一次。
+
+```shell
+# 1) 算出 Android 使用的文件名（必须！Flutter 按 hash 找文件）
+openssl x509 -in cacert.pem -noout -subject_hash_old
+# 假设输出 c8750f0d
+
+# 2) 直接改名（PEM 格式最稳妥，DER 也可以，模块会自动转成 PEM）
+cp cacert.pem c8750f0d.0
+
+# 3) push 进手机
+adb push c8750f0d.0 /data/local/tmp/cert/
+
+# 4) 重启手机，或点模块的 Action 按钮
+```
+
+> **为什么你把证书放到 `/data/local/tmp/cert` 没生效？** 常见原因有 4 个：
+>
+> 1. **没有重启 / 没有点 Action**：模块只在开机（post-fs-data）和点 Action 时导入这个目录，放进去不会自动生效。
+> 2. **文件名不对**：必须是 `<subject_hash_old>.0`，例如 `c8750f0d.0`。叫 `mitmproxy.pem`、`burp.cer` 这种名字，Java 应用可能还能用，**Flutter 一定找不到**。
+> 3. **格式不对**：老版本模块会删掉非 DER 文件、README 也让人转成 DER——但 **Flutter 只认 PEM**。本版本两种都收，并且会自动把 DER 转成 PEM。
+> 4. **证书不是 CA 证书**：必须是带 `basicConstraints=CA:TRUE` 的根证书，服务器证书/自签证书不行。
+
+## 方式三：WebUI 查看 / 删除
+
+模块自带的网页可以查看已安装证书、删除证书、切换模式、查看日志（长按删除）。
+
+## KernelSU / APatch 用户注意
+
+如果 app 的 **App Profile** 里开启了「卸载模块 / Umount modules」，该 app 会看不到模块挂载的证书，抓包必然失败。
+请把抓包目标 app 的这个选项关掉（或全局关闭），然后再点一次 Action / 重启。
+
+# Flutter / Android 16 抓包
+
+本版本（v1.7.0）针对 Android 16 的修复点：
+
+1. **证书格式**：合并仓库统一 PEM（Android 用户证书是 DER，Flutter 读不了）。
+2. **老路径**：`/system/etc/security/cacerts` 改由模块 overlay 提供（magic mount / overlayfs），不再依赖 post-fs-data 里的 bind 是否传播到 app 命名空间；overlay 没生效时还会自动 bind 兜底。
+3. **新路径**：`service.sh` 常驻注入 `/apex/com.android.conscrypt/cacerts` 到 zygote / usap / 已运行 app 的 namespace，并在 zygote 重启后自动重新注入。
+4. **诊断**：新增 `action.sh`，在 KernelSU/APatch 里点 Action 会输出证书数量、两条路径是否带上了你的证书、注入状态；日志在 `/data/adb/modules/MoveCertificate/install.log`，状态快照在 `status.txt`。
+
+验证过的事实（用真实的 Dart VM + BoringSSL 跑过）：
+
+| 证书目录内容 | Flutter/Dart 结果 |
+|---|---|
+| `<hash>.0` + **DER**（Android 用户证书原样） | ❌ `CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate` |
+| `<hash>.0` + **PEM**（本模块转换后） | ✅ 200 |
+| PEM 但文件名不是 hash | ❌ 找不到 |
+
+如果某个 Flutter app 装了证书还是抓不到，先排除 app 自己做了 **SSL Pinning**（需要在 frida 层 hook `libflutter.so` 的 `ssl_verify_cert_chain` / `SSL_CTX_set_custom_verify`），这已不是证书问题。
+
+# 排查方法
+
+1. 点模块 **Action**（KernelSU / APatch），看输出里的：
+   * `cert store`：仓库证书数量（正常 100+）
+   * `probe cert`：你装的那张证书（探针）
+   * `/system/etc/security/cacerts` 与 `/apex/.../cacerts` 是否 `探针: yes`
+2. 看 `/data/adb/modules/MoveCertificate/install.log`（每次开机重写）。
+3. root shell 里手动确认：
+   ```shell
+   ls -l /system/etc/security/cacerts/c8750f0d.0
+   ls -l /apex/com.android.conscrypt/cacerts/c8750f0d.0
+   head -c 11 /system/etc/security/cacerts/c8750f0d.0   # 应输出 -----BEGIN 
+   nsenter --mount=/proc/<app pid>/ns/mnt -- ls /apex/com.android.conscrypt/cacerts
+   ```
+
+# 构建
+
+```shell
+./buildzip.sh all   # 需要 node/npm 编译 WebUI
+./buildzip.sh sweb  # 跳过 WebUI 编译
+```
+
 # 使用实测
 ![2024-02-19_01.27.27](README.assets/2024-02-19_01.27.27.png)
 
@@ -71,3 +173,5 @@ mv cacert.der 02e06844.0
 - https://github.com/andyacer/movecert
 - https://book.hacktricks.xyz/v/cn/mobile-pentesting/android-app-pentesting/install-burp-certificate#android-14-zhi-hou 
 - https://kernelsu.org/zh_CN/guide/module.html
+- https://github.com/dart-lang/sdk/blob/main/runtime/bin/security_context_linux.cc
+- https://github.com/google/boringssl/blob/master/crypto/x509/x509_d2.cc

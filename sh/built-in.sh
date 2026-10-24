@@ -1,42 +1,22 @@
 #!/system/bin/sh
-MODDIR=${0%/*}
+# shellcheck shell=sh
+# ============================================================================
+# 内置模式（magisk magic mount / kernelsu overlayfs）
+# ----------------------------------------------------------------------------
+# 具体实现已统一到 sh/store.sh 的 install_builtin_mode()，
+# 这里只保留旧的函数名。
+#
+# 注意：旧实现会先 rm -rf $MODULE_CERT_DIR/* 再只放用户证书，
+# 等于把系统 CA 目录替换成"只有用户证书"，导致整机 TLS 崩掉。
+# 新实现先合并系统证书 + 用户证书，数量 < 20 时直接放弃。
+# ============================================================================
 
-# 使用内置方法
+MODDIR=${MODDIR:-${0%/*}}
 
 init_low_builtin_method() {
-
-    print_log "Use built-in method"
-    rm -rf $MODULE_CERT_DIR/*
-    print_log "Backup $USER_CERT_DIR to $MODULE_CERT_DIR"
-    cp -u $USER_CERT_DIR/* $MODULE_CERT_DIR
-    move_custom_cert
-    compatible
-    cp -f $MODULE_CERT_DIR/* $MODULE_SYSTEM_CERT_DIR
-    print_log "Install $MODULE_SYSTEM_CERT_DIR status:$?"
-    fix_system_permissions $MODULE_SYSTEM_CERT_DIR
-    print_log "Fix $MODULE_SYSTEM_CERT_DIR permissions status:$?" 
-    set_selinux_context $SYSTEM_CERT_DIR $MODULE_SYSTEM_CERT_DIR
-    
+    install_builtin_mode
 }
 
 init_high_builtin_method() {
-    
-    print_log "Use built-in method"
-    rm -rf $MODULE_CERT_DIR/*
-    print_log "Backup $USER_CERT_DIR to $MODULE_CERT_DIR"
-    cp -u $USER_CERT_DIR/* $MODULE_CERT_DIR
-    move_custom_cert
-    compatible
-    cp -f $MODULE_CERT_DIR/* $MODULE_APEX_CONSCRYPT_DIR
-    print_log "Install $MODULE_APEX_CONSCRYPT_DIR status:$?"
-    rm -rf $MODULE_APEX_CONSCRYPT_NUM_DIR/*
-    cp -f $MODULE_CERT_DIR/* $MODULE_APEX_CONSCRYPT_NUM_DIR
-    print_log "Install $MODULE_APEX_CONSCRYPT_NUM_DIR status:$?"
-    fix_system_permissions14 $MODULE_APEX_CONSCRYPT_DIR
-    print_log "Fix $MODULE_APEX_CONSCRYPT_DIR permissions status:$?" 
-    fix_system_permissions14 $MODULE_APEX_CONSCRYPT_NUM_DIR
-    print_log "Fix $MODULE_APEX_CONSCRYPT_NUM_DIR permissions status:$?" 
-    set_selinux_context $APEX_CONSCRYPT_DIR $MODULE_APEX_CONSCRYPT_DIR
-    set_selinux_context $APEX_CONSCRYPT_DIR $MODULE_APEX_CONSCRYPT_NUM_DIR
-    
+    install_builtin_mode
 }

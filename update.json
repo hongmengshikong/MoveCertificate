@@ -1,6 +1,5 @@
 {
-    "versionCode": 28,
-    "version": "v1.6.2",
-    "zipUrl": "https://pfile.ys1231.cn/modules/MoveCertificate/MoveCertificate-v1.6.2.zip",
-    "changelog": "https://pfile.ys1231.cn/modules/MoveCertificate/changelog.md"
+    "versionCode": 31,
+    "version": "v1.7.0-flutter16",
+    "changelog": "修复安卓16上 Flutter/Dart 应用抓不到包：证书统一转成 PEM、补齐 /system/etc/security/cacerts 路径、按进程注入 APEX 挂载；同时保留安卓14/15的修复。"
 }
